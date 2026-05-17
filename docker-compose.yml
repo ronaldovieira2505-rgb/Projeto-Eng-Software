@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  presentation-service:
+    build: .
+    container_name: presentation-service
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./outputs:/app/outputs
+      - ./shared_presentations:/app/shared_presentations
+      - ./templates:/app/templates
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
