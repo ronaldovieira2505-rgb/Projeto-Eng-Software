@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 4096
 
     GITHUB_TOKEN: str = ""
+    GEMINI_API_KEY: str | None = None
 
     STORAGE_BACKEND: str = "local"
     LOCAL_STORAGE_PATH: str = "/tmp/presentations"
