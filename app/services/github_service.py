@@ -15,9 +15,10 @@ def _headers() -> dict:
     return h
 
 # Renomeado de get_commits para fetch_commits para bater com a rota
-async def fetch_commits(owner: str, repo: str, branch: str = "main", limit: int = 30) -> List[str]:
-    """Retorna lista de mensagens de commit."""
-    url = f"{GITHUB_API}/repos/{owner}/{repo}/commits"
+async def fetch_commits(repo: str, branch: str = "main", limit: int = 30) -> List[str]:
+    owner, repo_name = repo.split("/", 1)   # separa internamente
+    url = f"{GITHUB_API}/repos/{owner}/{repo_name}/commits"
+    # ... resto igual
     params = {"sha": branch, "per_page": limit}
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(url, headers=_headers(), params=params)
