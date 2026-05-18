@@ -1,14 +1,23 @@
 """
 LLM Service — US1, US5, US6, US7, US9
-Suporta dois providers: Anthropic (Claude) e Google GenAI (Gemini).
-Controlado pela variável LLM_PROVIDER no .env
+Suporta Anthropic (Claude) e Google GenAI (Gemini).
+
+Robustez implementada:
+  - Retry automático com backoff exponencial (até 3 tentativas)
+  - Timeout configurável por chamada
+  - Fallback de provider: se Gemini falhar após retries, tenta Anthropic (se configurado)
+  - Logging estruturado de todas as chamadas e erros
 """
 import json
 import re
+import time
+import logging
 from typing import List
 
 from app.core.config import settings
 from app.schemas.presentation import SlideContent, ToneEnum, PresentationTypeEnum
+
+logger = logging.getLogger(__name__)
 
 
 # ── Instruções de tom — US6 ───────────────────────────────────────────────────
@@ -20,15 +29,15 @@ TONE_INSTRUCTIONS: dict[ToneEnum, str] = {
     ),
     ToneEnum.persuasive: (
         "Use linguagem persuasiva e orientada a valor. Destaque impactos positivos, "
-        "benefícios de negócio e conquistas. Adequado para apresentações a clientes e investidores."
+        "benefícios de negócio e conquistas. Adequado para clientes e investidores."
     ),
     ToneEnum.technical: (
         "Use terminologia técnica precisa. Inclua detalhes de implementação, "
-        "padrões de arquitetura e métricas quando relevante. Adequado para equipes de engenharia."
+        "padrões de arquitetura e métricas. Adequado para equipes de engenharia."
     ),
     ToneEnum.simplified: (
-        "Use linguagem simples e acessível. SUBSTITUA todos os termos técnicos por analogias "
-        "do cotidiano. Nunca use siglas sem explicar. Adequado para stakeholders não-técnicos."
+        "Use linguagem simples e acessível. SUBSTITUA todos os termos técnicos por "
+        "analogias do cotidiano. Nunca use siglas sem explicar. Adequado para não-técnicos."
     ),
 }
 
@@ -37,51 +46,48 @@ TONE_INSTRUCTIONS: dict[ToneEnum, str] = {
 
 PRESENTATION_TYPE_INSTRUCTIONS: dict[str, str] = {
     PresentationTypeEnum.sprint_review: (
-        "Esta é uma Sprint Review. Estruture os slides em: "
+        "Esta é uma Sprint Review. Estruture em: "
         "1) Resumo da Sprint, 2) Funcionalidades Entregues, 3) Destaques Técnicos, "
-        "4) Métricas (velocidade, bugs, cobertura), 5) Impedimentos encontrados, 6) Próximos Passos."
+        "4) Métricas (velocidade, bugs, cobertura), 5) Impedimentos, 6) Próximos Passos."
     ),
     PresentationTypeEnum.next_steps: (
-        "Esta é uma apresentação de PRÓXIMOS PASSOS. Objetivo: alinhar expectativas "
-        "sobre o que vem a seguir. Estruture assim: "
-        "1) Contexto atual (onde estamos), 2) Objetivos do próximo ciclo, "
-        "3) Lista priorizada de próximas tarefas (máx. 5 por slide), "
-        "4) Responsáveis e prazos estimados, 5) Dependências e riscos, "
-        "6) Critérios de sucesso. Use verbos de ação nos bullets (Implementar, Validar, Entregar)."
+        "Esta é uma apresentação de PRÓXIMOS PASSOS. Estruture assim: "
+        "1) Contexto atual, 2) Objetivos do próximo ciclo, "
+        "3) Lista priorizada de tarefas (máx. 5 por slide), "
+        "4) Responsáveis e prazos, 5) Dependências e riscos, "
+        "6) Critérios de sucesso. Use verbos de ação (Implementar, Validar, Entregar)."
     ),
     PresentationTypeEnum.architecture: (
-        "Esta é uma apresentação de Arquitetura. Estruture em: "
-        "1) Visão geral do sistema, 2) Componentes e responsabilidades, "
+        "Apresentação de Arquitetura. Estruture em: "
+        "1) Visão geral, 2) Componentes e responsabilidades, "
         "3) Fluxo de dados, 4) Decisões de arquitetura (ADRs), "
         "5) Pontos de integração, 6) Escalabilidade e resiliência."
     ),
     PresentationTypeEnum.roadmap: (
-        "Esta é uma apresentação de Roadmap. Organize por trimestres ou sprints: "
+        "Apresentação de Roadmap. Organize por trimestres/sprints: "
         "1) Visão de longo prazo, 2) Prioridades atuais, 3) Próximas entregas, "
         "4) Itens em análise, 5) O que ficou fora do escopo e por quê."
     ),
     PresentationTypeEnum.post_mortem: (
-        "Esta é uma apresentação de Post-Mortem. Sem apontar culpados. "
-        "Estruture em: 1) Linha do tempo do incidente, 2) Causa raiz, "
-        "3) Impacto (usuários afetados, tempo de indisponibilidade), "
-        "4) O que funcionou bem, 5) O que melhorar, "
+        "Apresentação de Post-Mortem. Sem apontar culpados. "
+        "Estruture em: 1) Linha do tempo, 2) Causa raiz, "
+        "3) Impacto, 4) O que funcionou bem, 5) O que melhorar, "
         "6) Plano de ação com responsáveis e datas."
     ),
     PresentationTypeEnum.onboarding: (
-        "Esta é uma apresentação de Onboarding. Seja didático e acolhedor. "
+        "Apresentação de Onboarding. Seja didático. "
         "Estruture em: 1) Visão geral do produto, 2) Stack tecnológica, "
-        "3) Como rodar localmente, 4) Fluxo de trabalho do time (Git, PR, Review), "
+        "3) Como rodar localmente, 4) Fluxo de trabalho (Git, PR, Review), "
         "5) Onde encontrar documentação, 6) Primeiras tarefas sugeridas."
     ),
     PresentationTypeEnum.tech_stack: (
-        "Esta é uma apresentação de Tech Stack. Estruture em: "
-        "1) Visão geral das tecnologias, 2) Backend, 3) Frontend, "
-        "4) Infraestrutura e Deploy, 5) Ferramentas de qualidade, "
+        "Apresentação de Tech Stack. Estruture em: "
+        "1) Visão geral, 2) Backend, 3) Frontend, "
+        "4) Infraestrutura e Deploy, 5) Qualidade (testes, lint, monitoramento), "
         "6) Justificativa das escolhas técnicas."
     ),
     PresentationTypeEnum.generic: (
-        "Gere uma apresentação clara e bem estruturada. "
-        "Comece com introdução/contexto e termine com conclusões ou próximos passos."
+        "Apresentação genérica. Comece com contexto e termine com conclusões ou próximos passos."
     ),
 }
 
@@ -89,39 +95,39 @@ PRESENTATION_TYPE_INSTRUCTIONS: dict[str, str] = {
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = (
-    "Você é um especialista em comunicação técnica e storytelling para times de engenharia de software. "
-    "Transforma informações técnicas brutas em apresentações claras e bem estruturadas. "
+    "Você é um especialista em comunicação técnica para times de engenharia de software. "
+    "Transforma informações técnicas em apresentações claras e bem estruturadas. "
     "Responda SOMENTE com JSON válido, sem texto adicional, sem markdown, sem blocos de código."
 )
 
 SLIDES_PROMPT = """\
 Gere uma apresentação de exatamente {num_slides} slides com base no conteúdo abaixo.
 
-REGRAS DE TOM — siga rigorosamente:
+TOM — siga rigorosamente:
 {tone_instruction}
 
-ESTRUTURA ESPERADA PARA ESTE TIPO:
+ESTRUTURA PARA ESTE TIPO:
 {type_instruction}
 
-CONTEÚDO DE ENTRADA:
+CONTEÚDO:
 ---
 {content}
 ---
 
-REGRAS DE FORMATAÇÃO:
-- Cada slide deve ter entre 3 e 5 bullets objetivos (máx. 12 palavras cada)
-- O campo "notes" deve conter explicação detalhada para o apresentador (2-3 frases)
-- Se o conteúdo contiver código relevante, preencha "code_snippet" com o trecho principal
-- O título da apresentação deve ser descritivo, não genérico
+REGRAS:
+- Cada slide: 3 a 5 bullets (máx. 12 palavras cada)
+- "notes": explicação detalhada para o apresentador (2-3 frases)
+- Se houver código relevante, preencha "code_snippet"
+- Título da apresentação deve ser descritivo
 
-Responda SOMENTE com este JSON:
+JSON de resposta:
 {{
-  "title": "Título descritivo da apresentação",
+  "title": "Título descritivo",
   "slides": [
     {{
       "title": "Título do slide",
       "bullets": ["bullet 1", "bullet 2", "bullet 3"],
-      "notes": "Notas detalhadas para o apresentador.",
+      "notes": "Notas para o apresentador.",
       "code_snippet": null,
       "code_language": null
     }}
@@ -130,9 +136,9 @@ Responda SOMENTE com este JSON:
 """
 
 SUMMARIZE_PROMPT = """\
-Resuma o texto abaixo em tópicos curtos para uso em slides.
+Resuma o texto abaixo em tópicos curtos para slides.
 
-REGRAS DE TOM:
+TOM:
 {tone_instruction}
 
 {simplify_block}
@@ -143,12 +149,11 @@ TEXTO:
 ---
 
 REGRAS:
-- Gere no máximo {max_bullets} tópicos
-- Cada tópico: máx. 12 palavras
-- O resumo deve capturar a essência do texto inteiro em uma frase
+- Máx. {max_bullets} tópicos, cada um com máx. 12 palavras
+- "summary": essência do texto em uma frase
 - Não invente informações
 
-Responda SOMENTE com este JSON:
+JSON de resposta:
 {{
   "bullets": ["tópico 1", "tópico 2"],
   "summary": "Uma frase que resume tudo."
@@ -156,31 +161,46 @@ Responda SOMENTE com este JSON:
 """
 
 SIMPLIFY_BLOCK = """\
-REGRA EXTRA — SIMPLIFICAÇÃO OBRIGATÓRIA (público não-técnico):
+SIMPLIFICAÇÃO OBRIGATÓRIA (público não-técnico):
 - Substitua TODOS os termos técnicos por linguagem do cotidiano
-- Nunca use siglas sem explicar entre parênteses na primeira ocorrência
-- Foque em valor de negócio, não em detalhes de implementação
+- Nunca use siglas sem explicar entre parênteses
+- Foque em valor de negócio, não em detalhes técnicos
 Exemplos: "deploy" → "publicação do sistema", "bug" → "erro",
-"refatoração" → "limpeza e organização do código", "latência" → "tempo de resposta"
+"refatoração" → "organização do código", "latência" → "tempo de resposta"
 """
 
 
-# ── Chamada ao LLM ────────────────────────────────────────────────────────────
+# ── Retry com backoff exponencial ─────────────────────────────────────────────
 
-def _call_llm(user_prompt: str) -> str:
+def _retry_call(fn, *args, max_attempts: int = 3, base_delay: float = 1.5, **kwargs) -> str:
     """
-    Despacha para o provider configurado no .env via LLM_PROVIDER:
-      - "anthropic" → Claude
-      - "google"    → Gemini
+    Executa fn(*args, **kwargs) com retry automático.
+    Backoff: 1.5s → 3s → 6s entre tentativas.
+    Lança a última exceção se todas as tentativas falharem.
     """
-    if settings.LLM_PROVIDER == "anthropic":
-        return _call_anthropic(user_prompt)
-    if settings.LLM_PROVIDER == "google":
-        return _call_google(user_prompt)
-    raise ValueError(
-        f"LLM_PROVIDER '{settings.LLM_PROVIDER}' não suportado. Use 'anthropic' ou 'google'."
-    )
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = fn(*args, **kwargs)
+            if attempt > 1:
+                logger.info("LLM call succeeded on attempt %d", attempt)
+            return result
+        except Exception as exc:
+            last_exc = exc
+            delay = base_delay * (2 ** (attempt - 1))
+            logger.warning(
+                "LLM call failed (attempt %d/%d): %s — retrying in %.1fs",
+                attempt, max_attempts, exc, delay,
+            )
+            if attempt < max_attempts:
+                time.sleep(delay)
 
+    raise RuntimeError(
+        f"LLM call failed after {max_attempts} attempts. Last error: {last_exc}"
+    ) from last_exc
+
+
+# ── Chamadas por provider ─────────────────────────────────────────────────────
 
 def _call_anthropic(user_prompt: str) -> str:
     import anthropic
@@ -211,10 +231,47 @@ def _call_google(user_prompt: str) -> str:
     return response.text
 
 
+def _call_llm(user_prompt: str) -> str:
+    """
+    Despacha para o provider configurado.
+    Se o provider principal falhar após retries, tenta o fallback (se configurado).
+    """
+    primary   = settings.LLM_PROVIDER
+    fallback  = settings.LLM_FALLBACK_PROVIDER
+
+    provider_map = {
+        "anthropic": _call_anthropic,
+        "google":    _call_google,
+    }
+
+    if primary not in provider_map:
+        raise ValueError(f"LLM_PROVIDER '{primary}' inválido. Use 'anthropic' ou 'google'.")
+
+    logger.info("Calling LLM provider=%s", primary)
+
+    try:
+        return _retry_call(provider_map[primary], user_prompt)
+    except Exception as primary_exc:
+        logger.error("Primary LLM provider '%s' exhausted retries: %s", primary, primary_exc)
+
+        # Tenta fallback se configurado e diferente do primary
+        if fallback and fallback != primary and fallback in provider_map:
+            logger.warning("Attempting fallback provider='%s'", fallback)
+            try:
+                return _retry_call(provider_map[fallback], user_prompt)
+            except Exception as fallback_exc:
+                logger.error("Fallback provider '%s' also failed: %s", fallback, fallback_exc)
+                raise RuntimeError(
+                    f"Both LLM providers failed. Primary: {primary_exc}. Fallback: {fallback_exc}"
+                ) from fallback_exc
+
+        raise
+
+
 # ── Parser JSON ───────────────────────────────────────────────────────────────
 
 def _parse_json(raw: str) -> dict:
-    """Remove cercas de markdown e faz parse do JSON. Tolera texto antes/depois."""
+    """Remove cercas de markdown e faz parse do JSON."""
     clean = re.sub(r"```(?:json)?|```", "", raw).strip()
     start = clean.find("{")
     end   = clean.rfind("}") + 1
@@ -242,10 +299,12 @@ def generate_slides_from_text(
         type_instruction=type_instruction,
         content=content,
     )
+    logger.info("Generating slides: type=%s tone=%s num_slides=%d", presentation_type, tone, num_slides)
     raw  = _call_llm(prompt)
     data = _parse_json(raw)
     title  = data.get("title", "Apresentação")
     slides = [SlideContent(**s) for s in data.get("slides", [])]
+    logger.info("Slides generated: title='%s' count=%d", title, len(slides))
     return title, slides
 
 
@@ -262,5 +321,6 @@ def summarize_text(
         max_bullets=max_bullets,
         text=text,
     )
+    logger.info("Summarizing text: max_bullets=%d simplify=%s", max_bullets, simplify_technical)
     raw = _call_llm(prompt)
     return _parse_json(raw)

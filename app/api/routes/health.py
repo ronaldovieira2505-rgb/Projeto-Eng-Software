@@ -9,7 +9,8 @@ async def health():
 
 @router.get("/ready")
 async def ready():
+    is_ready = bool(settings.GEMINI_API_KEY or settings.ANTHROPIC_API_KEY)
     return {
-        "ready": bool(settings.ANTHROPIC_API_KEY or settings.OPENAI_API_KEY),
-        "checks": {"llm_key_configured": bool(settings.ANTHROPIC_API_KEY or settings.OPENAI_API_KEY)}
+        "status": "ok",
+        "ready": is_ready
     }

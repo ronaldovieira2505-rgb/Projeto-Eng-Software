@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -12,9 +12,13 @@ class Settings(BaseSettings):
     # App
     ENVIRONMENT: str = "development"
     SERVICE_NAME: str = "presentation-service"
+    LOG_LEVEL: str = "INFO"
 
-    # LLM — provider ativo: "anthropic" ou "google"
+    # LLM — provider principal: "anthropic" ou "google"
     LLM_PROVIDER: str = "google"
+    # Fallback automático se o provider principal falhar (deixe vazio para desativar)
+    LLM_FALLBACK_PROVIDER: Optional[str] = None
+    LLM_MAX_TOKENS: int = 4096
 
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
@@ -23,9 +27,6 @@ class Settings(BaseSettings):
     # Google Gemini
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
-
-    # Compartilhado
-    LLM_MAX_TOKENS: int = 4096
 
     # GitHub
     GITHUB_TOKEN: str = ""
