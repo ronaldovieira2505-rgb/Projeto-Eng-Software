@@ -21,6 +21,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/docs")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
