@@ -14,6 +14,7 @@ async def lifespan(app: FastAPI):
     print("🛑 Presentation Service shutting down")
 
 
+
 app = FastAPI(
     title="Presentation Service",
     description="Microsserviço de geração de apresentações com IA",
