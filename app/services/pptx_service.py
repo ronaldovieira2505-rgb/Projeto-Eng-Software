@@ -5,6 +5,7 @@ Suporta templates de marca (.pptx base) para manter identidade visual (US3).
 """
 import uuid
 import shutil
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -128,15 +129,15 @@ def _add_content_slide(prs: Presentation, slide_data: SlideContent) -> None:
 
 
 def _add_code_box(slide, code: str) -> None:
-    """Adiciona uma caixa de texto com estilo de editor de código ao slide."""
-    left   = Inches(0.4)
-    top    = Inches(4.6)
-    width  = Inches(12.5)
+    """Adiciona uma caixa de texto com estilo de editor de código e syntax highlighting."""
+    left = Inches(0.4)
+    top = Inches(4.6)
+    width = Inches(12.5)
     height = Inches(2.6)
 
     box = slide.shapes.add_textbox(left, top, width, height)
 
-    # Fundo escuro (estilo VS Code dark)
+    # Fundo escuro (estilo VS Code dark / Dracula)
     fill = box.fill
     fill.solid()
     fill.fore_color.rgb = RGBColor(0x1E, 0x1E, 0x2E)
@@ -144,14 +145,34 @@ def _add_code_box(slide, code: str) -> None:
     tf = box.text_frame
     tf.word_wrap = True
 
+    # Prepara o parágrafo
     para = tf.paragraphs[0]
-    para.text = code
-    run = para.runs[0] if para.runs else para.add_run()
-    run.text = code
-    run.font.size = Pt(9)
-    run.font.name = "Cascadia Code"   # fallback visual — PowerPoint usa fonte disponível
-    run.font.bold = False
-    run.font.color.rgb = RGBColor(0xA6, 0xE3, 0xA1)  # verde suave
+
+    # Regex inteligente que suporta sintaxe básica de Python, TS, JS e Go
+    pattern = re.compile(
+        r'(?P<string>"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')|'
+        r'(?P<comment>#.*?$|//.*?$)|'
+        r'(?P<keyword>\b(?:def|class|import|from|return|if|else|elif|for|while|try|except|async|await|with|as|pass|yield|break|continue|True|False|None|and|or|not|in|is|const|let|var|function|export|default|type|interface)\b)|'
+        r'(?P<other>(?:(?!["\']|#|//|\b(?:def|class|import|from|return|if|else|elif|for|while|try|except|async|await|with|as|pass|yield|break|continue|True|False|None|and|or|not|in|is|const|let|var|function|export|default|type|interface)\b).)+)',
+        re.MULTILINE
+    )
+
+    # Varre o código pintando cada pedaço detectado
+    for match in pattern.finditer(code):
+        run = para.add_run()
+        run.text = match.group(0)
+        run.font.size = Pt(9)
+        run.font.name = "Cascadia Code"
+        run.font.bold = False
+
+        if match.group("string"):
+            run.font.color.rgb = RGBColor(0xA6, 0xE3, 0xA1)  # Verde pastel
+        elif match.group("comment"):
+            run.font.color.rgb = RGBColor(0x7F, 0x84, 0x8E)  # Cinza discreto
+        elif match.group("keyword"):
+            run.font.color.rgb = RGBColor(0xC6, 0x78, 0xDD)  # Roxo
+        else:
+            run.font.color.rgb = RGBColor(0xDC, 0xDC, 0xDC)  # Branco gelo
 
 
 # ── API pública ───────────────────────────────────────────────────────────────
