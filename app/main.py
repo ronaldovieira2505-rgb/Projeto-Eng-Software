@@ -15,6 +15,7 @@ async def lifespan(app: FastAPI):
     print(f"🛑 {settings.SERVICE_NAME} shutting down")
 
 
+
 app = FastAPI(
     title="Presentation Service",
     description=(
@@ -24,6 +25,12 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/docs")
 
 app.add_middleware(
     CORSMiddleware,
