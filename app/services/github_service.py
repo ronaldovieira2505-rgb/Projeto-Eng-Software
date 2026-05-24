@@ -269,8 +269,9 @@ def releases_to_text(releases: list) -> str:
 
     lines = ["## Histórico de Releases (Changelog)\n"]
     for r in releases[:10]:
-        pub_at = r.get("published_at", "") if isinstance(r, dict) else getattr(r, "published_at", "")
-        tag_name = r.get("tag_name", "") if isinstance(r, dict) else getattr(r, "tag_name", "v?.?.?")
+        # Busca as chaves corretas: "date" e "tag" (conforme definido no fetch_releases)
+        pub_at = r.get("date", "") if isinstance(r, dict) else getattr(r, "date", "")
+        tag_name = r.get("tag", "") if isinstance(r, dict) else getattr(r, "tag", "v?.?.?")
         name = r.get("name", "") if isinstance(r, dict) else getattr(r, "name", "")
         body = r.get("body", "") if isinstance(r, dict) else getattr(r, "body", "")
 

@@ -108,7 +108,7 @@ class ChangelogRequest(BaseModel):
 class ChangelogEntry(BaseModel):
     type:    str        # feat | fix | refactor | docs | test | chore | other
     message: str
-    sha:     str
+    sha:     Optional[str] = None
 
 
 class ChangelogResponse(BaseModel):

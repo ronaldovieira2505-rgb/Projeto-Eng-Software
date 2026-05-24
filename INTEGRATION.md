@@ -131,7 +131,7 @@ POST /api/v1/presentations/export/pptx
 
 ### 5. Listar templates de marca disponíveis
 ```
-GET /api/v1/presentations/templates
+GET /api/v1/github/templates
 ```
 **Resposta:** `{ "templates": ["mackenzie", "cliente_x"] }`
 
