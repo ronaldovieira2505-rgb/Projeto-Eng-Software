@@ -112,3 +112,33 @@ async def get_pull_requests(repo: str, state: str = "closed") -> List[dict]:
         }
         for pr in resp.json()
     ]
+
+
+async def fetch_file_content(repo: str, path: str, branch: str = "main") -> Optional[str]:
+    """Busca o conteúdo de um arquivo específico no repositório."""
+    owner, name = _split(repo)
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(
+            f"{GITHUB_API}/repos/{owner}/{name}/contents/{path}",
+            headers=_headers(),
+            params={"ref": branch},
+        )
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        data = r.json()
+
+        # A API do GitHub retorna o conteúdo em Base64 para arquivos válidos
+        if "content" in data:
+            return base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
+        return None
+
+
+async def fetch_code_files(repo: str, branch: str, paths: List[str]) -> List[dict]:
+    """Busca o conteúdo de múltiplos arquivos a partir de uma lista de caminhos."""
+    files_data = []
+    for path in paths:
+        content = await fetch_file_content(repo, path, branch)
+        if content:
+            files_data.append({"path": path, "content": content})
+    return files_data
