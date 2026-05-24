@@ -1,6 +1,6 @@
 """
-GitHub Service — US1, US4, US8, US12, US19
-Commits, PRs, README, TODOs no código e tags de versão.
+GitHub Service — US1, US4, US8, US11, US12, US18, US19
+Integração avançada: Commits, PRs, README, TODOs via Git Trees, Tags e Releases.
 """
 import base64
 import re
@@ -9,10 +9,8 @@ from typing import List, Optional
 import httpx
 
 from app.core.config import settings
-from app.schemas.presentation import TodoItem
 
 GITHUB_API = "https://api.github.com"
-TODO_PATTERN = re.compile(r"#\s*(TODO|FIXME|HACK|NOTE)[:\s]+(.*)", re.IGNORECASE)
 
 
 def _headers() -> dict:
@@ -116,128 +114,39 @@ async def get_pull_requests(repo: str, state: str = "closed") -> List[dict]:
 
 
 def prs_to_text(prs: List[dict]) -> str:
+    """Formata a lista de PRs para o LLM resumir (US18)."""
     if not prs:
-        return "Nenhum PR encontrado."
-    lines = ["## Pull Requests\n"]
-    for pr in prs:
-        status = "✅ merged" if pr["merged"] else "🔄 open"
-        body   = pr["body"][:200].replace("\n", " ") if pr["body"] else "sem descrição"
-        lines.append(f"- #{pr['number']} [{status}] {pr['title']} (@{pr['user']})\n  {body}")
+        return "Nenhum Pull Request fechado recentemente."
+
+    lines = ["## Pull Requests Recentes\n"]
+    for pr in prs[:10]:  # Limita aos 10 mais recentes
+        status = "✅ Merged" if pr["merged"] else "❌ Closed"
+        lines.append(f"- #{pr['number']} ({status}): {pr['title']}\n  Detalhes: {pr['body'][:200]}...\n")
     return "\n".join(lines)
 
 
-# ── US12 — TODOs no código ────────────────────────────────────────────────────
+# ── Arquivos e Árvore (Helpers para TODOs) ────────────────────────────────────
 
-async def fetch_todos(
-    repo: str,
-    branch: str = "main",
-    extensions: Optional[List[str]] = None,
-) -> List[TodoItem]:
-    """
-    US12 — Percorre a árvore de arquivos do repositório, baixa os que
-    batem com as extensões e extrai comentários TODO/FIXME/HACK/NOTE.
-    """
-    if extensions is None:
-        extensions = [".py", ".ts", ".js", ".java", ".go"]
+async def fetch_repository_tree(repo: str, branch: str = "main") -> List[str]:
+    """Busca a árvore completa de arquivos do repositório de forma recursiva."""
+    owner, repo_name = _split(repo)
+    url = f"{GITHUB_API}/repos/{owner}/{repo_name}/git/trees/{branch}"
+    params = {"recursive": "1"}
 
-    owner, name = _split(repo)
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(url, headers=_headers(), params=params)
+        if resp.status_code == 404:
+            return []
+        resp.raise_for_status()
 
-    # 1. Busca a árvore recursiva de arquivos
-    async with httpx.AsyncClient(timeout=30) as c:
-        r = await c.get(
-            f"{GITHUB_API}/repos/{owner}/{name}/git/trees/{branch}",
-            headers=_headers(),
-            params={"recursive": "1"},
-        )
-        r.raise_for_status()
-        tree = r.json().get("tree", [])
-
-    # Filtra apenas arquivos com extensões desejadas (máx. 30 para não estourar rate limit)
-    files = [
-        item for item in tree
-        if item["type"] == "blob"
-        and any(item["path"].endswith(ext) for ext in extensions)
-    ][:30]
-
-    todos: List[TodoItem] = []
-
-    async with httpx.AsyncClient(timeout=30) as c:
-        for file in files:
-            try:
-                r = await c.get(file["url"], headers=_headers())
-                if r.status_code != 200:
-                    continue
-                content_b64 = r.json().get("content", "")
-                content = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
-
-                for line_num, line in enumerate(content.splitlines(), start=1):
-                    match = TODO_PATTERN.search(line)
-                    if match:
-                        todos.append(TodoItem(
-                            file=file["path"],
-                            line=line_num,
-                            tag=match.group(1).upper(),
-                            message=match.group(2).strip(),
-                        ))
-            except Exception:
-                continue  # arquivo ilegível, pula
-
-    return todos
-
-
-def todos_to_text(todos: List[TodoItem]) -> str:
-    if not todos:
-        return "Nenhum TODO/FIXME encontrado."
-    lines = [f"Total: {len(todos)} itens\n"]
-    for t in todos:
-        lines.append(f"[{t.tag}] {t.file}:{t.line} — {t.message}")
-    return "\n".join(lines)
-
-
-# ── US19 — Tags / Releases ────────────────────────────────────────────────────
-
-async def fetch_releases(repo: str) -> List[dict]:
-    """US19 — Retorna releases publicadas (ou tags se não houver releases)."""
-    owner, name = _split(repo)
-
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(
-            f"{GITHUB_API}/repos/{owner}/{name}/releases",
-            headers=_headers(),
-            params={"per_page": 20},
-        )
-        r.raise_for_status()
-        releases = r.json()
-
-    if releases:
-        return [
-            {
-                "tag":  rel["tag_name"],
-                "name": rel["name"] or rel["tag_name"],
-                "date": (rel.get("published_at") or "")[:10],
-                "body": (rel.get("body") or "")[:400],
-            }
-            for rel in releases
-        ]
-
-    # Fallback: usa tags simples se não houver releases formais
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(
-            f"{GITHUB_API}/repos/{owner}/{name}/tags",
-            headers=_headers(),
-            params={"per_page": 20},
-        )
-        r.raise_for_status()
-
-    return [
-        {"tag": t["name"], "name": t["name"], "date": None, "body": None}
-        for t in r.json()
-    ]
+    tree = resp.json().get("tree", [])
+    # Retorna apenas caminhos de arquivos válidos (blob) ignorando pastas (tree)
+    return [item["path"] for item in tree if item["type"] == "blob"]
 
 
 async def fetch_file_content(repo: str, path: str, branch: str = "main") -> Optional[str]:
     """Busca o conteúdo de um arquivo específico no repositório."""
-    owner, name = _split_repo(repo)
+    owner, name = _split(repo)
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(
             f"{GITHUB_API}/repos/{owner}/{name}/contents/{path}",
@@ -264,42 +173,24 @@ async def fetch_code_files(repo: str, branch: str, paths: List[str]) -> List[dic
             files_data.append({"path": path, "content": content})
     return files_data
 
-import re
 
-# ── Git Trees & Engenharia Reversa de TODOs (US12) ────────────────────────────
+# ── US12 — TODOs no código ────────────────────────────────────────────────────
 
-async def fetch_repository_tree(repo: str, branch: str = "main") -> List[str]:
-    """Busca a árvore completa de arquivos do repositório de forma recursiva."""
-    owner, repo_name = _split_repo(repo)
-    url = f"{GITHUB_API}/repos/{owner}/{repo_name}/git/trees/{branch}"
-    params = {"recursive": "1"}
+async def fetch_todos(
+        repo: str,
+        branch: str = "main",
+        extensions: Optional[List[str]] = None
+) -> List[dict]:
+    """Varre arquivos de código do repositório buscando marcações TODO: ou FIXME:."""
+    if extensions is None:
+        extensions = [".py", ".ts", ".js", ".java", ".go", ".cpp", ".cs", ".php"]
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.get(url, headers=_headers(), params=params)
-        if resp.status_code == 404:
-            return []
-        resp.raise_for_status()
-
-    tree = resp.json().get("tree", [])
-    # Retorna apenas caminhos de arquivos válidos (blob) ignorando pastas (tree)
-    return [item["path"] for item in tree if item["type"] == "blob"]
-
-async def scan_todos_in_code(repo: str, branch: str = "main") -> List[dict]:
-    """
-    US12 — Varre arquivos de código do repositório buscando marcações TODO: ou FIXME:.
-    Retorna uma lista estruturada para o LLM gerar o Roadmap e mapear Dívida Técnica.
-    """
     all_files = await fetch_repository_tree(repo, branch)
+    code_files = [f for f in all_files if any(f.endswith(ext) for ext in extensions)]
 
-    # Filtra por extensões de código (evita arquivos estáticos, binários ou muito pesados)
-    valid_extensions = {".py", ".js", ".ts", ".go", ".java", ".cpp", ".cs", ".php"}
-    code_files = [f for f in all_files if any(f.endswith(ext) for ext in valid_extensions)]
-
-    # Limitamos a 50 arquivos para não estourar o limite da API durante a demo do MVP
     files_data = await fetch_code_files(repo, branch, code_files[:50])
     todos = []
 
-    # Regex para capturar: # TODO: ..., // FIXME: ..., /* TODO: ...
     todo_pattern = re.compile(r"(?i)(?:#|//|/\*)\s*(TODO|FIXME)[\s:]+(.*)")
 
     for file_data in files_data:
@@ -310,17 +201,34 @@ async def scan_todos_in_code(repo: str, branch: str = "main") -> List[dict]:
                 todos.append({
                     "file": file_data["path"],
                     "line": i,
-                    "type": match.group(1).upper(),
-                    "description": match.group(2).strip()
+                    "tag": match.group(1).upper(),
+                    "message": match.group(2).strip()
                 })
     return todos
 
 
-# ── Tags e Releases (US11, US19) ──────────────────────────────────────────────
+def todos_to_text(todos: list) -> str:
+    """Formata a lista de TODOs para o LLM."""
+    if not todos:
+        return "Nenhum TODO ou FIXME encontrado no código."
+
+    lines = ["## Dívidas Técnicas e Tarefas Pendentes no Código (TODOs)\n"]
+    for t in todos:
+        # Suporta tanto dicionário (API real) quanto objeto Pydantic (Testes)
+        tag = t["tag"] if isinstance(t, dict) else getattr(t, "tag", "TODO")
+        file = t["file"] if isinstance(t, dict) else getattr(t, "file", "desconhecido")
+        line = t["line"] if isinstance(t, dict) else getattr(t, "line", 0)
+        msg = t["message"] if isinstance(t, dict) else getattr(t, "message", "")
+
+        lines.append(f"- [{tag}] Arquivo `{file}` (Linha {line}): {msg}")
+    return "\n".join(lines)
+
+
+# ── US19 / US11 — Tags e Releases ──────────────────────────────────────────────
 
 async def fetch_tags(repo: str) -> List[dict]:
     """US19 — Busca tags de versão (ex: v1.0.0) para marcos cronológicos."""
-    owner, repo_name = _split_repo(repo)
+    owner, repo_name = _split(repo)
     url = f"{GITHUB_API}/repos/{owner}/{repo_name}/tags"
 
     async with httpx.AsyncClient(timeout=15) as client:
@@ -331,9 +239,10 @@ async def fetch_tags(repo: str) -> List[dict]:
 
     return [{"name": t["name"], "commit": t["commit"]["sha"]} for t in resp.json()]
 
+
 async def fetch_releases(repo: str) -> List[dict]:
     """US11 — Busca os releases oficiais para compor os slides de Changelog."""
-    owner, repo_name = _split_repo(repo)
+    owner, repo_name = _split(repo)
     url = f"{GITHUB_API}/repos/{owner}/{repo_name}/releases"
 
     async with httpx.AsyncClient(timeout=15) as client:
@@ -353,25 +262,35 @@ async def fetch_releases(repo: str) -> List[dict]:
     ]
 
 
-def todos_to_text(todos: List[dict]) -> str:
-    """Formata a lista de TODOs para o LLM."""
-    if not todos:
-        return "Nenhum TODO ou FIXME encontrado no código."
+def releases_to_text(releases: list) -> str:
+    """Formata a lista de releases para o LLM gerar o Changelog (US11)."""
+    if not releases:
+        return "Nenhum release encontrado no repositório."
 
-    lines = ["## Dívidas Técnicas e Tarefas Pendentes no Código (TODOs)\n"]
-    for t in todos:
-        lines.append(f"- [{t['type']}] Arquivo `{t['file']}` (Linha {t['line']}): {t['description']}")
+    lines = ["## Histórico de Releases (Changelog)\n"]
+    for r in releases[:10]:
+        pub_at = r.get("published_at", "") if isinstance(r, dict) else getattr(r, "published_at", "")
+        tag_name = r.get("tag_name", "") if isinstance(r, dict) else getattr(r, "tag_name", "v?.?.?")
+        name = r.get("name", "") if isinstance(r, dict) else getattr(r, "name", "")
+        body = r.get("body", "") if isinstance(r, dict) else getattr(r, "body", "")
+
+        data_curta = pub_at[:10] if pub_at else "Data desconhecida"
+        nome_display = name or tag_name
+        lines.append(f"- **{tag_name}** ({data_curta}): {nome_display}")
+
+        if body:
+            lines.append(f"  Detalhes: {body[:200]}...")
+
     return "\n".join(lines)
 
 
+def tags_to_text(tags: List[dict]) -> str:
+    """Formata a lista de tags para o LLM mapear os marcos (US19)."""
+    if not tags:
+        return "Nenhuma tag encontrada."
 
-def prs_to_text(prs: List[dict]) -> str:
-    """Formata a lista de PRs para o LLM resumir (US18)."""
-    if not prs:
-        return "Nenhum Pull Request fechado recentemente."
+    lines = ["## Tags de Versão\n"]
+    for t in tags[:15]:
+        lines.append(f"- {t['name']} (Commit: {t['commit'][:7]})")
 
-    lines = ["## Pull Requests Recentes\n"]
-    for pr in prs[:10]:  # Limita aos 10 mais recentes
-        status = "✅ Merged" if pr["merged"] else "❌ Closed"
-        lines.append(f"- #{pr['number']} ({status}): {pr['title']}\n  Detalhes: {pr['body'][:200]}...\n")
     return "\n".join(lines)
