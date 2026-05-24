@@ -191,6 +191,24 @@ class ReleaseItem(BaseModel):
     body:    Optional[str] = None
 
 
+# ── US21 — Diagrama de arquitetura ──────────────────────────────────────────
+
+class DiagramRequest(BaseModel):
+    diagram:       str      = Field(..., description="Descrição textual ou DSL do diagrama de arquitetura (ex: PlantUML, Mermaid, texto livre)")
+    tone:          ToneEnum = ToneEnum.technical
+    num_slides:    int      = Field(default=6, ge=3, le=15)
+    template_name: Optional[str] = "default"
+
+
+# ── US21 — Diagrama de arquitetura ──────────────────────────────────────────
+
+class DiagramRequest(BaseModel):
+    diagram:       str      = Field(..., description="Descrição textual ou DSL do diagrama de arquitetura (ex: PlantUML, Mermaid, texto livre)")
+    tone:          ToneEnum = ToneEnum.technical
+    num_slides:    int      = Field(default=6, ge=3, le=15)
+    template_name: Optional[str] = "default"
+
+
 # ── US20 — Improve slides ─────────────────────────────────────────────────────
 
 class ImproveRequest(BaseModel):

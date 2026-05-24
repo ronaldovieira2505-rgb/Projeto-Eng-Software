@@ -19,6 +19,7 @@ from app.schemas.presentation import (
     ReleasesRequest,
     TodosRequest, TodosResponse,
     ImproveRequest, ImproveResponse,
+    DiagramRequest,
 )
 from app.services import llm_service, pptx_service
 from app.services.github_service import (
@@ -279,6 +280,26 @@ async def generate_from_todos(body: TodosRequest):
     return TodosResponse(
         total=len(todos), items=todos, slides=slides,
         presentation_id=pid, download_url=_dl(filename),
+    )
+
+
+# ── US21 — Diagrama de arquitetura ──────────────────────────────────────────
+
+@router.post("/generate/diagram", response_model=PresentationResponse,
+             summary="US21 — Gerar slides explicativos a partir de diagrama de arquitetura")
+async def generate_from_diagram(body: DiagramRequest):
+    try:
+        title, slides = llm_service.generate_from_diagram(
+            diagram=body.diagram, tone=body.tone, num_slides=body.num_slides,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro LLM: {e}")
+
+    _, filename = pptx_service.export_to_pptx(slides, title, body.template_name)
+    pid = _pid()
+    return PresentationResponse(
+        presentation_id=pid, title=title, slides=slides,
+        download_url=_dl(filename), share_url=_share(pid),
     )
 
 

@@ -330,6 +330,46 @@ JSON:
 }}
 """
 
+DIAGRAM_PROMPT = """\
+Você recebeu um diagrama de arquitetura abaixo (pode estar em formato textual, Mermaid, PlantUML ou descrição livre).
+Gere uma apresentação de exatamente {num_slides} slides explicando o fluxo de dados e os componentes.
+
+TOM: {tone_instruction}
+
+ESTRUTURA SUGERIDA:
+1) Visão geral da arquitetura
+2) Componentes principais e responsabilidades
+3) Fluxo de dados (passo a passo)
+4) Integrações e dependências externas
+5) Decisões de design e trade-offs
+6) Pontos de atenção e próximos passos
+
+DIAGRAMA:
+---
+{diagram}
+---
+
+REGRAS:
+- 3–5 bullets por slide (máx. 12 palavras cada)
+- "notes": 2-3 frases explicando o fluxo para o apresentador
+- Preencha "code_snippet" com trecho relevante do diagrama se aplicável
+- Título descritivo (não genérico)
+
+JSON:
+{{
+  "title": "Título descritivo",
+  "slides": [
+    {{
+      "title": "Título do slide",
+      "bullets": ["bullet 1", "bullet 2", "bullet 3"],
+      "notes": "Notas para o apresentador.",
+      "code_snippet": null,
+      "code_language": null
+    }}
+  ]
+}}
+"""
+
 
 # ── Retry ─────────────────────────────────────────────────────────────────────
 
@@ -518,6 +558,21 @@ def generate_from_todos(todos_text: str, tone: ToneEnum) -> tuple[str, List[Slid
         todos_text=todos_text,
     )
     logger.info("generate_from_todos: tone=%s", tone)
+    return _parse_slides(_parse_json(_call_llm(prompt)))
+
+
+# ── US21 — Diagrama de arquitetura ───────────────────────────────────────────
+
+def generate_from_diagram(
+    diagram: str, tone: ToneEnum, num_slides: int,
+) -> tuple[str, List[SlideContent]]:
+    """US21 — Gera slides explicativos sobre fluxo de dados a partir de diagrama de arquitetura."""
+    prompt = DIAGRAM_PROMPT.format(
+        num_slides=num_slides,
+        tone_instruction=_tone(tone),
+        diagram=diagram,
+    )
+    logger.info("generate_from_diagram: tone=%s n=%d", tone, num_slides)
     return _parse_slides(_parse_json(_call_llm(prompt)))
 
 
