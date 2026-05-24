@@ -162,7 +162,6 @@ async def generate_changelog(body: ChangelogRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro LLM: {e}")
 
-    slides = [s for s in []]  # type hint helper
     title  = data.get("title", "Changelog")
     raw_slides = data.get("slides", [])
 

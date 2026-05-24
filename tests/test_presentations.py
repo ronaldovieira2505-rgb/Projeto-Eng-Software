@@ -294,3 +294,81 @@ def test_github_failure_returns_502(mock):
     mock.side_effect = Exception("Connection refused")
     r = client.post("/api/v1/presentations/generate/commits", json={"repo": "owner/repo"})
     assert r.status_code == 502
+
+
+# ── Mais testes para atingir 31 (Edge cases e falhas) ──────────────────────
+
+def test_download_not_found():
+    """Garante que tentar baixar um arquivo que não existe retorna 404."""
+    r = client.get("/api/v1/presentations/download/arquivo_inexistente_123.pptx")
+    assert r.status_code == 404
+
+
+@patch("app.api.routes.presentations.fetch_todos", new_callable=AsyncMock)
+def test_todos_no_slides(mock_gh):
+    """US12 — Testa o comportamento quando generate_slides é False (retorna só os dados)."""
+    from app.schemas.presentation import TodoItem
+    mock_gh.return_value = [TodoItem(file="app/main.py", line=10, tag="TODO", message="Fix")]
+
+    r = client.post("/api/v1/presentations/generate/todos", json={
+        "repo": "owner/repo", "generate_slides": False
+    })
+
+    assert r.status_code == 200
+    assert r.json()["total"] == 1
+    assert r.json().get("slides") is None
+
+
+@patch("app.api.routes.presentations.fetch_releases", new_callable=AsyncMock)
+def test_releases_empty(mock_gh):
+    """US19 — Se não houver releases, deve retornar erro 404 claro."""
+    mock_gh.return_value = []
+    r = client.post("/api/v1/presentations/generate/releases", json={"repo": "owner/repo"})
+    assert r.status_code == 404
+
+
+@patch("app.api.routes.presentations.fetch_commits_detailed", new_callable=AsyncMock)
+def test_changelog_github_failure(mock_gh):
+    """US11 — Se a API do GitHub cair durante a geração de changelog, devolve 502."""
+    mock_gh.side_effect = Exception("API rate limit")
+    r = client.post("/api/v1/presentations/changelog", json={"repo": "owner/repo"})
+    assert r.status_code == 502
+
+
+@patch("app.api.routes.presentations.llm_service.generate_faq")
+def test_faq_llm_failure(mock_llm):
+    """US13 — Se o LLM cair durante a geração de FAQ, devolve 500."""
+    mock_llm.side_effect = Exception("LLM fora do ar")
+    r = client.post("/api/v1/presentations/faq", json={
+        "content": "Conteúdo", "num_questions": 3
+    })
+    assert r.status_code == 500
+
+
+@patch("app.api.routes.presentations.llm_service.suggest_improvements")
+def test_improve_llm_failure(mock_llm):
+    """US20 — Se o LLM falhar ao sugerir melhorias, devolve 500."""
+    mock_llm.side_effect = Exception("Timeout LLM")
+    r = client.post("/api/v1/presentations/improve", json={
+        "slides": [{"title": "S1", "bullets": ["B1"]}],
+    })
+    assert r.status_code == 500
+
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+def test_export_pptx_failure(mock_pptx):
+    """US2 — Falha na escrita do arquivo no disco deve gerar 500."""
+    mock_pptx.side_effect = Exception("Disco cheio")
+    r = client.post("/api/v1/presentations/export/pptx", json={
+        "title": "Apresentação", "slides": []
+    })
+    assert r.status_code == 500
+
+
+@patch("app.api.routes.presentations.get_pull_requests", new_callable=AsyncMock)
+def test_pr_summary_github_failure(mock_gh):
+    """US18 — Falha de comunicação com GitHub buscando PRs devolve 502."""
+    mock_gh.side_effect = Exception("GitHub down")
+    r = client.post("/api/v1/presentations/generate/pull-requests", json={"repo": "owner/repo"})
+    assert r.status_code == 502
+

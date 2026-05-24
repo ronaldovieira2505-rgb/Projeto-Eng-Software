@@ -5,7 +5,7 @@ Integração avançada: Commits, PRs, README, TODOs via Git Trees, Tags e Releas
 import base64
 import re
 from typing import List, Optional
-
+from app.schemas.presentation import TodoItem
 import httpx
 
 from app.core.config import settings
@@ -180,7 +180,7 @@ async def fetch_todos(
         repo: str,
         branch: str = "main",
         extensions: Optional[List[str]] = None
-) -> List[dict]:
+) -> List[TodoItem]:
     """Varre arquivos de código do repositório buscando marcações TODO: ou FIXME:."""
     if extensions is None:
         extensions = [".py", ".ts", ".js", ".java", ".go", ".cpp", ".cs", ".php"]
@@ -198,12 +198,12 @@ async def fetch_todos(
         for i, line in enumerate(content.splitlines(), 1):
             match = todo_pattern.search(line)
             if match:
-                todos.append({
-                    "file": file_data["path"],
-                    "line": i,
-                    "tag": match.group(1).upper(),
-                    "message": match.group(2).strip()
-                })
+                todos.append(TodoItem(
+                    file=file_data["path"],
+                    line=i,
+                    tag=match.group(1).upper(),
+                    message=match.group(2).strip()
+                ))
     return todos
 
 
@@ -253,10 +253,10 @@ async def fetch_releases(repo: str) -> List[dict]:
 
     return [
         {
-            "tag_name": r["tag_name"],
+            "tag": r["tag_name"],
             "name": r.get("name", ""),
             "body": r.get("body", ""),
-            "published_at": r["published_at"]
+            "date": r.get("published_at", "")[:10]
         }
         for r in resp.json()
     ]
