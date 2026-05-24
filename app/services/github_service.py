@@ -243,6 +243,7 @@ def todos_to_text(todos: List[dict]) -> str:
     return "\n".join(lines)
 
 
+
 def prs_to_text(prs: List[dict]) -> str:
     """Formata a lista de PRs para o LLM resumir (US18)."""
     if not prs:
