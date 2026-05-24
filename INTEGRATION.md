@@ -194,3 +194,63 @@ const resp = await fetch("http://presentation-service:8000/api/v1/presentations/
 const data = await resp.json();
 console.log(data.bullets);
 ```
+### 6. Atualização: Novos Tipos de Apresentação Aceitos
+No endpoint `/generate/text`, além dos tipos básicos, você agora pode enviar:
+`risks` (Mapeamento de Riscos) · `lessons_learned` (Lições Aprendidas) · `technical_debt` (Dívida Técnica) · `architecture_evolution` (Evolução da Arquitetura)
+
+---
+
+### 7. Gerar Roadmap Técnico via TODOs no Código (US12)
+**Caso de uso:** Lê a árvore de arquivos de código no GitHub e extrai comentários `TODO:` ou `FIXME:` transformando em slides de Dívida Técnica/Roadmap.
+
+```http
+POST /api/v1/presentations/generate/todos
+
+{
+  "repo": "owner/nome-do-repo",
+  "branch": "main",
+  "extensions": [".py", ".ts", ".js", ".java", ".go"],
+  "generate_slides": true,
+  "tone": "formal"
+}
+
+POST /api/v1/presentations/generate/releases
+
+{
+  "repo": "owner/nome-do-repo",
+  "tone": "persuasive"
+}
+
+POST /api/v1/presentations/changelog
+
+{
+  "repo": "owner/nome-do-repo",
+  "num_commits": 30,
+  "tone": "formal"
+}
+
+POST /api/v1/presentations/generate/pull-requests
+
+{
+  "repo": "owner/nome-do-repo",
+  "state": "closed",
+  "tone": "technical"
+}
+
+POST /api/v1/presentations/faq
+
+{
+  "content": "Conteúdo bruto sobre o qual o FAQ será gerado...",
+  "num_questions": 5,
+  "audience": "diretoria"
+}
+
+POST /api/v1/presentations/improve
+
+{
+  "slides": [
+    { "title": "Slide 1", "bullets": ["Fizemos X", "Entregamos Y"] }
+  ],
+  "audience": "stakeholders",
+  "tone": "persuasive"
+}
