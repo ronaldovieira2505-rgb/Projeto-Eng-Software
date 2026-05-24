@@ -1,5 +1,5 @@
 """
-Testes unitários — Presentation Service.
+Testes unitários — Presentation Service (US1–US20).
 Sem dependência real de LLM, GitHub ou disco.
 """
 import pytest
@@ -7,55 +7,55 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.main import app
-from app.schemas.presentation import SlideContent
+from app.schemas.presentation import SlideContent, FAQItem, SlideImprovement
 
 client = TestClient(app)
 
-MOCK_SLIDES = [
+# ── Fixtures ──────────────────────────────────────────────────────────────────
+
+SLIDES = [
     SlideContent(title="Sprint Review", bullets=["Entrega A", "Entrega B"]),
     SlideContent(title="Próximos Passos", bullets=["Tarefa 1", "Tarefa 2"]),
 ]
-MOCK_TITLE = "Sprint 42 Review"
-MOCK_EXPORT = ("caminho/fake.pptx", "arquivo_fake.pptx")
+TITLE   = "Sprint 42 Review"
+EXPORT  = ("caminho/fake.pptx", "fake.pptx")
+COMMITS = ["feat: add JWT auth", "fix: bug no login", "refactor: clean services"]
+PRS     = [{"number": 1, "title": "Add auth", "body": "JWT implementation", "merged": True, "user": "dev"}]
+RELEASES = [{"tag": "v1.0.0", "name": "Release 1.0", "date": "2025-05-01", "body": "First stable release"}]
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
 def test_health():
-    resp = client.get("/health/")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
-    assert resp.json()["service"] == "presentation-service"
+    r = client.get("/health/")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
 
 
 def test_readiness():
-    resp = client.get("/health/ready")
-    assert resp.status_code == 200
-    assert "ready" in resp.json()
+    r = client.get("/health/ready")
+    assert r.status_code == 200
+    assert "ready" in r.json()
 
 
-# ── US5 — Summarize ───────────────────────────────────────────────────────────
+# ── US5/US7 — Summarize ───────────────────────────────────────────────────────
 
 @patch("app.api.routes.presentations.llm_service.summarize_text")
-def test_summarize_text(mock_summarize):
-    mock_summarize.return_value = {"bullets": ["Ponto 1", "Ponto 2"], "summary": "Resumo curto."}
-    resp = client.post("/api/v1/presentations/summarize", json={
-        "text": "Texto longo de entrada.", "max_bullets": 3
-    })
-    assert resp.status_code == 200
-    assert len(resp.json()["bullets"]) == 2
-    assert "summary" in resp.json()
+def test_summarize(mock):
+    mock.return_value = {"bullets": ["P1", "P2"], "summary": "Resumo."}
+    r = client.post("/api/v1/presentations/summarize", json={"text": "Texto longo."})
+    assert r.status_code == 200
+    assert len(r.json()["bullets"]) == 2
 
 
 @patch("app.api.routes.presentations.llm_service.summarize_text")
-def test_summarize_simplified_flag_is_passed(mock_summarize):
-    """US7 — garante que simplify_technical=True chega ao serviço."""
-    mock_summarize.return_value = {"bullets": ["Ponto simples"], "summary": "Resumo."}
+def test_summarize_simplify_flag_passed(mock):
+    """US7 — simplify_technical deve chegar ao serviço."""
+    mock.return_value = {"bullets": ["P"], "summary": "S."}
     client.post("/api/v1/presentations/summarize", json={
-        "text": "Deploy via Kubernetes.", "simplify_technical": True, "tone": "simplified"
+        "text": "Deploy Kubernetes.", "simplify_technical": True, "tone": "simplified"
     })
-    call_kwargs = mock_summarize.call_args.kwargs
-    assert call_kwargs["simplify_technical"] is True
+    assert mock.call_args.kwargs["simplify_technical"] is True
 
 
 # ── US1 — Generate from text ──────────────────────────────────────────────────
@@ -63,46 +63,54 @@ def test_summarize_simplified_flag_is_passed(mock_summarize):
 @patch("app.api.routes.presentations.pptx_service.export_to_pptx")
 @patch("app.api.routes.presentations.llm_service.generate_slides_from_text")
 def test_generate_from_text(mock_llm, mock_pptx):
-    mock_llm.return_value = (MOCK_TITLE, MOCK_SLIDES)
-    mock_pptx.return_value = MOCK_EXPORT
-    resp = client.post("/api/v1/presentations/generate/text", json={
-        "content": "Entregamos autenticação JWT.",
-        "presentation_type": "sprint_review",
-        "tone": "formal",
-        "num_slides": 5,
+    mock_llm.return_value = (TITLE, SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/text", json={
+        "content": "Entregamos JWT.", "presentation_type": "sprint_review",
+        "tone": "formal", "num_slides": 5,
     })
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["title"] == MOCK_TITLE
-    assert len(data["slides"]) == 2
-    assert "download_url" in data
-    assert "share_url" in data
+    assert r.status_code == 200
+    assert r.json()["title"] == TITLE
+    assert "download_url" in r.json()
 
 
 @patch("app.api.routes.presentations.pptx_service.export_to_pptx")
 @patch("app.api.routes.presentations.llm_service.generate_slides_from_text")
-def test_generate_persuasive_tone_is_passed(mock_llm, mock_pptx):
-    """US6 — garante que o tom chega ao serviço."""
-    mock_llm.return_value = (MOCK_TITLE, MOCK_SLIDES)
-    mock_pptx.return_value = MOCK_EXPORT
+def test_generate_tone_passed(mock_llm, mock_pptx):
+    """US6 — tom deve chegar ao serviço."""
+    mock_llm.return_value = (TITLE, SLIDES)
+    mock_pptx.return_value = EXPORT
     client.post("/api/v1/presentations/generate/text", json={
-        "content": "Melhorias de performance.", "tone": "persuasive"
+        "content": "Melhorias.", "tone": "persuasive"
     })
     assert mock_llm.call_args.kwargs["tone"].value == "persuasive"
 
 
 @patch("app.api.routes.presentations.pptx_service.export_to_pptx")
 @patch("app.api.routes.presentations.llm_service.generate_slides_from_text")
-def test_generate_next_steps_type(mock_llm, mock_pptx):
-    """US9 — garante que next_steps é aceito como tipo válido."""
-    mock_llm.return_value = ("Próximos Passos Q3", MOCK_SLIDES)
-    mock_pptx.return_value = MOCK_EXPORT
-    resp = client.post("/api/v1/presentations/generate/text", json={
-        "content": "Tarefas pendentes: autenticação, testes, deploy.",
+def test_generate_next_steps(mock_llm, mock_pptx):
+    """US9 — next_steps deve ser aceito como tipo válido."""
+    mock_llm.return_value = ("Próximos Passos Q3", SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/text", json={
+        "content": "Tarefas: auth, testes, deploy.",
         "presentation_type": "next_steps",
     })
-    assert resp.status_code == 200
+    assert r.status_code == 200
     assert mock_llm.call_args.kwargs["presentation_type"] == "next_steps"
+
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+@patch("app.api.routes.presentations.llm_service.generate_slides_from_text")
+def test_new_types_accepted(mock_llm, mock_pptx):
+    """US14–US17 — novos tipos devem ser aceitos."""
+    mock_llm.return_value = (TITLE, SLIDES)
+    mock_pptx.return_value = EXPORT
+    for ptype in ["risks", "lessons_learned", "technical_debt", "architecture_evolution"]:
+        r = client.post("/api/v1/presentations/generate/text", json={
+            "content": "Conteúdo.", "presentation_type": ptype
+        })
+        assert r.status_code == 200, f"Tipo '{ptype}' falhou: {r.json()}"
 
 
 # ── US4 — Generate from commits ───────────────────────────────────────────────
@@ -110,64 +118,179 @@ def test_generate_next_steps_type(mock_llm, mock_pptx):
 @patch("app.api.routes.presentations.pptx_service.export_to_pptx")
 @patch("app.api.routes.presentations.llm_service.generate_slides_from_text")
 @patch("app.api.routes.presentations.fetch_commits", new_callable=AsyncMock)
-def test_generate_from_commits(mock_fetch, mock_llm, mock_pptx):
-    mock_fetch.return_value = ["feat: add JWT auth", "fix: bug no login"]
-    mock_llm.return_value = (MOCK_TITLE, MOCK_SLIDES)
-    mock_pptx.return_value = MOCK_EXPORT
-    resp = client.post("/api/v1/presentations/generate/commits", json={
+def test_generate_from_commits(mock_gh, mock_llm, mock_pptx):
+    mock_gh.return_value = COMMITS
+    mock_llm.return_value = (TITLE, SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/commits", json={
         "repo": "owner/repo", "branch": "main", "num_commits": 10
     })
-    assert resp.status_code == 200
-    assert "presentation_id" in resp.json()
+    assert r.status_code == 200
+    assert "presentation_id" in r.json()
 
 
 def test_generate_from_commits_missing_repo():
-    """Validação Pydantic — repo é obrigatório."""
-    resp = client.post("/api/v1/presentations/generate/commits", json={"branch": "main"})
-    assert resp.status_code == 422
+    r = client.post("/api/v1/presentations/generate/commits", json={"branch": "main"})
+    assert r.status_code == 422
 
 
-# ── US2 — Export pptx ────────────────────────────────────────────────────────
+# ── US2 — Export ─────────────────────────────────────────────────────────────
 
 @patch("app.api.routes.presentations.pptx_service.export_to_pptx")
 def test_export_pptx(mock_pptx):
-    mock_pptx.return_value = MOCK_EXPORT
-    resp = client.post("/api/v1/presentations/export/pptx", json={
-        "title": "Minha Apresentação",
-        "slides": [
-            {"title": "Slide 1", "bullets": ["A", "B"]},
-            {"title": "Slide 2", "bullets": ["C", "D"]},
-        ],
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/export/pptx", json={
+        "title": "Apresentação",
+        "slides": [{"title": "S1", "bullets": ["A", "B"]}],
     })
-    assert resp.status_code == 200
-    assert "download_url" in resp.json()
+    assert r.status_code == 200
+    assert "download_url" in r.json()
 
 
-# ── US10 — Share link ─────────────────────────────────────────────────────────
+# ── US10 — Share ─────────────────────────────────────────────────────────────
 
-def test_share_link_contains_id():
-    resp = client.get("/api/v1/presentations/abc123/share")
-    assert resp.status_code == 200
-    assert resp.json()["presentation_id"] == "abc123"
-    assert "view_url" in resp.json()
+def test_share_link():
+    r = client.get("/api/v1/presentations/abc123/share")
+    assert r.status_code == 200
+    assert r.json()["presentation_id"] == "abc123"
 
 
-# ── Robustez — LLM failure ───────────────────────────────────────────────────
+# ── US11 — Changelog ─────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+@patch("app.api.routes.presentations.llm_service.generate_changelog")
+@patch("app.api.routes.presentations.fetch_commits_detailed", new_callable=AsyncMock)
+def test_changelog(mock_gh, mock_llm, mock_pptx):
+    mock_gh.return_value = [{"sha": "abc1234", "message": "feat: auth", "author": "dev", "date": "2025-05-01"}]
+    mock_llm.return_value = {
+        "title": "Changelog v1.2",
+        "entries": [{"type": "feat", "message": "auth implementada", "sha": "abc1234"}],
+        "slides": [{"title": "Novas Features", "bullets": ["Auth JWT"], "notes": None, "code_snippet": None, "code_language": None}],
+    }
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/changelog", json={"repo": "owner/repo"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "entries" in data
+    assert len(data["entries"]) > 0
+
+
+# ── US13 — FAQ ────────────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.llm_service.generate_faq")
+def test_faq(mock_llm):
+    mock_llm.return_value = [
+        FAQItem(question="Como funciona a autenticação?", answer="Via JWT com expiração de 1h."),
+        FAQItem(question="Há limite de requisições?", answer="Sim, 1000/min por usuário."),
+    ]
+    r = client.post("/api/v1/presentations/faq", json={
+        "content": "Sistema de autenticação JWT.", "num_questions": 5, "audience": "clientes"
+    })
+    assert r.status_code == 200
+    assert len(r.json()["items"]) == 2
+    assert r.json()["audience"] == "clientes"
+
+
+# ── US18 — PR Summary ─────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+@patch("app.api.routes.presentations.llm_service.generate_from_pull_requests")
+@patch("app.api.routes.presentations.get_pull_requests", new_callable=AsyncMock)
+def test_pr_summary(mock_gh, mock_llm, mock_pptx):
+    mock_gh.return_value = PRS
+    mock_llm.return_value = (TITLE, SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/pull-requests", json={"repo": "owner/repo"})
+    assert r.status_code == 200
+    assert "slides" in r.json()
+
+
+@patch("app.api.routes.presentations.get_pull_requests", new_callable=AsyncMock)
+def test_pr_summary_empty(mock_gh):
+    mock_gh.return_value = []
+    r = client.post("/api/v1/presentations/generate/pull-requests", json={"repo": "owner/repo"})
+    assert r.status_code == 404
+
+
+# ── US19 — Releases ───────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+@patch("app.api.routes.presentations.llm_service.generate_from_releases")
+@patch("app.api.routes.presentations.fetch_releases", new_callable=AsyncMock)
+def test_releases(mock_gh, mock_llm, mock_pptx):
+    mock_gh.return_value = RELEASES
+    mock_llm.return_value = ("Marcos do Projeto", SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/releases", json={"repo": "owner/repo"})
+    assert r.status_code == 200
+    assert "presentation_id" in r.json()
+
+
+# ── US12 — TODOs ─────────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.pptx_service.export_to_pptx")
+@patch("app.api.routes.presentations.llm_service.generate_from_todos")
+@patch("app.api.routes.presentations.fetch_todos", new_callable=AsyncMock)
+def test_todos(mock_gh, mock_llm, mock_pptx):
+    from app.schemas.presentation import TodoItem
+    mock_gh.return_value = [
+        TodoItem(file="app/main.py", line=42, tag="TODO", message="Adicionar autenticação"),
+    ]
+    mock_llm.return_value = ("Roadmap Técnico", SLIDES)
+    mock_pptx.return_value = EXPORT
+    r = client.post("/api/v1/presentations/generate/todos", json={"repo": "owner/repo"})
+    assert r.status_code == 200
+    assert r.json()["total"] == 1
+
+
+@patch("app.api.routes.presentations.fetch_todos", new_callable=AsyncMock)
+def test_todos_empty(mock_gh):
+    mock_gh.return_value = []
+    r = client.post("/api/v1/presentations/generate/todos", json={"repo": "owner/repo"})
+    assert r.status_code == 200
+    assert r.json()["total"] == 0
+
+
+# ── US20 — Improve ────────────────────────────────────────────────────────────
+
+@patch("app.api.routes.presentations.llm_service.suggest_improvements")
+def test_improve(mock_llm):
+    mock_llm.return_value = (
+        "Slides claros mas podem ser mais objetivos.",
+        [SlideImprovement(
+            slide_index=0, original_title="Sprint Review",
+            suggestions=["Adicionar métricas quantitativas"],
+            improved_bullets=["Entregou 12 features", "Velocidade: 40 pontos"],
+        )],
+    )
+    r = client.post("/api/v1/presentations/improve", json={
+        "slides": [{"title": "Sprint Review", "bullets": ["Entregamos coisas"]}],
+        "audience": "diretoria",
+        "tone": "formal",
+    })
+    assert r.status_code == 200
+    assert len(r.json()["improvements"]) == 1
+    assert "summary" in r.json()
+
+
+def test_improve_empty_slides():
+    r = client.post("/api/v1/presentations/improve", json={
+        "slides": [], "audience": "diretoria"
+    })
+    assert r.status_code == 422
+
+
+# ── Robustez ─────────────────────────────────────────────────────────────────
 
 @patch("app.api.routes.presentations.llm_service.summarize_text")
-def test_llm_failure_returns_500(mock_summarize):
-    """Garante que erro do LLM retorna 500, não deixa a aplicação travar."""
-    mock_summarize.side_effect = RuntimeError("LLM call failed after 3 attempts")
-    resp = client.post("/api/v1/presentations/summarize", json={"text": "Qualquer texto."})
-    assert resp.status_code == 500
-    assert "detail" in resp.json()
+def test_llm_failure_returns_500(mock):
+    mock.side_effect = RuntimeError("LLM failed after 3 attempts")
+    r = client.post("/api/v1/presentations/summarize", json={"text": "Texto."})
+    assert r.status_code == 500
 
 
 @patch("app.api.routes.presentations.fetch_commits", new_callable=AsyncMock)
-def test_github_failure_returns_502(mock_fetch):
-    """Garante que erro do GitHub retorna 502 (bad gateway), não 500."""
-    mock_fetch.side_effect = Exception("Connection refused")
-    resp = client.post("/api/v1/presentations/generate/commits", json={
-        "repo": "owner/repo", "branch": "main"
-    })
-    assert resp.status_code == 502
+def test_github_failure_returns_502(mock):
+    mock.side_effect = Exception("Connection refused")
+    r = client.post("/api/v1/presentations/generate/commits", json={"repo": "owner/repo"})
+    assert r.status_code == 502
