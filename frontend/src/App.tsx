@@ -21,9 +21,13 @@ export default function App() {
 
   return (
     <Layout activePage={activePage} onNavigate={setActivePage}>
-      {activePage === "dashboard" && (
-        <Dashboard presentations={presentations} stats={stats} />
-      )}
+     {activePage === "dashboard" && (
+  <Dashboard
+    presentations={presentations}
+    stats={stats}
+    onNavigate={setActivePage}
+  />
+)}
       {activePage === "create" && (
         <CreatePresentation
           onGenerate={handleGenerate}
