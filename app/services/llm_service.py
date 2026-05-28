@@ -16,7 +16,6 @@ from app.schemas.presentation import (
 
 logger = logging.getLogger(__name__)
 
-
 # ── Tom de voz ────────────────────────────────────────────────────────────────
 
 TONE_INSTRUCTIONS: dict[ToneEnum, str] = {
@@ -37,7 +36,6 @@ TONE_INSTRUCTIONS: dict[ToneEnum, str] = {
         "Nunca use siglas sem explicar. Adequado para não-técnicos."
     ),
 }
-
 
 # ── Tipos de apresentação ─────────────────────────────────────────────────────
 
@@ -65,7 +63,8 @@ PRESENTATION_TYPE_INSTRUCTIONS: dict[str, str] = {
     ),
     PresentationTypeEnum.onboarding: (
         "Onboarding. Didático e acolhedor. Estruture: 1) Visão do produto, 2) Stack, "
-        "3) Rodar localmente, 4) Fluxo Git/PR/Review, 5) Documentação, 6) Primeiras tarefas."
+        "3) Rodar localmente, 4) Fluxo Git/PR/Review, 5) Exemplos práticos de uso de código "
+        "(OBRIGATÓRIO: gere os exemplos na chave 'code_snippet' do JSON e defina 'code_language'), 6) Primeiras tarefas."
     ),
     PresentationTypeEnum.tech_stack: (
         "Tech Stack. Estruture: 1) Visão geral, 2) Backend, 3) Frontend, "
@@ -101,8 +100,19 @@ PRESENTATION_TYPE_INSTRUCTIONS: dict[str, str] = {
     PresentationTypeEnum.generic: (
         "Apresentação genérica. Comece com contexto e termine com conclusões."
     ),
+    PresentationTypeEnum.monthly_retrospective: (
+        "Retrospectiva Mensal. Estruture: 1) Resumo da evolução no mês, 2) Principais entregas, "
+        "3) Desafios superados, 4) Evolução de métricas, 5) Próximos passos."
+    ),
+    PresentationTypeEnum.cicd_strategy: (
+        "Estratégia de CI/CD. Mostre a eficiência do processo para stakeholders. Estruture: 1) Visão do pipeline, "
+        "2) Automação de testes, 3) Processo de deploy, 4) Métricas (frequência, tempo de build), 5) Benefícios e ROI."
+    ),
+    PresentationTypeEnum.frontend_backend_progress: (
+        "Progresso Backend e Frontend. OBRIGATÓRIO: Crie slides separados exclusivamente para o progresso do Backend "
+        "e slides separados para o Frontend. Detalhe as entregas, esforço técnico e integrações de cada área."
+    ),
 }
-
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -330,6 +340,30 @@ JSON:
 }}
 """
 
+REVIEW_PROMPT = """\
+Você é um Arquiteto de Software Sênior revisando slides gerados por IA. 
+Sua missão é garantir que NENHUM conceito técnico foi deturpado ou simplificado demais a ponto de ficar incorreto.
+
+SLIDES ATUAIS:
+---
+{slides_text}
+---
+
+Para cada erro técnico grave, aponte o problema e sugira a correção. Se tudo estiver correto, retorne a lista vazia.
+
+JSON:
+{{
+  "summary": "Avaliação geral da precisão técnica em 1-2 frases.",
+  "corrections": [
+    {{
+      "slide_index": 0,
+      "issue": "O conceito X foi simplificado de forma incorreta.",
+      "suggestion": "Reescrever o bullet para: ..."
+    }}
+  ]
+}}
+"""
+
 DIAGRAM_PROMPT = """\
 Você recebeu um diagrama de arquitetura abaixo (pode estar em formato textual, Mermaid, PlantUML ou descrição livre).
 Gere uma apresentação de exatamente {num_slides} slides explicando o fluxo de dados e os componentes.
@@ -419,7 +453,7 @@ def _call_google(prompt: str) -> str:
 
 def _call_llm(prompt: str) -> str:
     provider_map = {"anthropic": _call_anthropic, "google": _call_google}
-    primary  = settings.LLM_PROVIDER
+    primary = settings.LLM_PROVIDER
     fallback = settings.LLM_FALLBACK_PROVIDER
 
     if primary not in provider_map:
@@ -441,7 +475,7 @@ def _call_llm(prompt: str) -> str:
 def _parse_json(raw: str) -> dict:
     clean = re.sub(r"```(?:json)?|```", "", raw).strip()
     start = clean.find("{")
-    end   = clean.rfind("}") + 1
+    end = clean.rfind("}") + 1
     if start == -1 or end == 0:
         raise ValueError(f"LLM não retornou JSON válido:\n{raw[:300]}")
     return json.loads(clean[start:end])
@@ -452,13 +486,15 @@ def _parse_json(raw: str) -> dict:
 def _tone(tone: ToneEnum) -> str:
     return TONE_INSTRUCTIONS[tone]
 
+
 def _type_instruction(ptype: str) -> str:
     return PRESENTATION_TYPE_INSTRUCTIONS.get(
         ptype, PRESENTATION_TYPE_INSTRUCTIONS[PresentationTypeEnum.generic]
     )
 
+
 def _parse_slides(data: dict) -> tuple[str, List[SlideContent]]:
-    title  = data.get("title", "Apresentação")
+    title = data.get("title", "Apresentação")
     slides = [SlideContent(**s) for s in data.get("slides", [])]
     return title, slides
 
@@ -466,7 +502,7 @@ def _parse_slides(data: dict) -> tuple[str, List[SlideContent]]:
 # ── Funções públicas — US originais ───────────────────────────────────────────
 
 def generate_slides_from_text(
-    content: str, presentation_type: str, tone: ToneEnum, num_slides: int,
+        content: str, presentation_type: str, tone: ToneEnum, num_slides: int,
 ) -> tuple[str, List[SlideContent]]:
     """US1, US4, US9, US14–US17 — Gera slides a partir de texto."""
     prompt = SLIDES_PROMPT.format(
@@ -480,7 +516,7 @@ def generate_slides_from_text(
 
 
 def summarize_text(
-    text: str, max_bullets: int, tone: ToneEnum, simplify_technical: bool,
+        text: str, max_bullets: int, tone: ToneEnum, simplify_technical: bool,
 ) -> dict:
     """US5, US7 — Resume texto em bullets."""
     prompt = SUMMARIZE_PROMPT.format(
@@ -511,7 +547,7 @@ def generate_changelog(commits_text: str, tone: ToneEnum) -> dict:
 # ── US13 — FAQ ────────────────────────────────────────────────────────────────
 
 def generate_faq(
-    content: str, num_questions: int, tone: ToneEnum, audience: str,
+        content: str, num_questions: int, tone: ToneEnum, audience: str,
 ) -> List[FAQItem]:
     """US13 — Gera perguntas frequentes com respostas para preparar o apresentador."""
     prompt = FAQ_PROMPT.format(
@@ -521,7 +557,7 @@ def generate_faq(
         content=content,
     )
     logger.info("generate_faq: audience=%s n=%d", audience, num_questions)
-    data  = _parse_json(_call_llm(prompt))
+    data = _parse_json(_call_llm(prompt))
     return [FAQItem(**item) for item in data.get("items", [])]
 
 
@@ -564,7 +600,7 @@ def generate_from_todos(todos_text: str, tone: ToneEnum) -> tuple[str, List[Slid
 # ── US21 — Diagrama de arquitetura ───────────────────────────────────────────
 
 def generate_from_diagram(
-    diagram: str, tone: ToneEnum, num_slides: int,
+        diagram: str, tone: ToneEnum, num_slides: int,
 ) -> tuple[str, List[SlideContent]]:
     """US21 — Gera slides explicativos sobre fluxo de dados a partir de diagrama de arquitetura."""
     prompt = DIAGRAM_PROMPT.format(
@@ -579,7 +615,7 @@ def generate_from_diagram(
 # ── US20 — Improve slides ─────────────────────────────────────────────────────
 
 def suggest_improvements(
-    slides: List[SlideContent], audience: str, tone: ToneEnum,
+        slides: List[SlideContent], audience: str, tone: ToneEnum,
 ) -> tuple[str, List[SlideImprovement]]:
     """US20 — Analisa slides existentes e sugere melhorias via IA."""
     slides_text = "\n".join(
@@ -593,6 +629,19 @@ def suggest_improvements(
     )
     logger.info("suggest_improvements: audience=%s tone=%s slides=%d", audience, tone, len(slides))
     data = _parse_json(_call_llm(prompt))
-    summary     = data.get("summary", "")
+    summary = data.get("summary", "")
     improvements = [SlideImprovement(**item) for item in data.get("improvements", [])]
     return summary, improvements
+
+# ── US — Revisão Técnica ──────────────────────────────────────────────────────
+
+def review_technical_accuracy(slides: List[SlideContent]) -> dict:
+    """US: Revisa descrições técnicas para evitar deturpação de conceitos."""
+    slides_text = "\n".join(
+        f"[Slide {i}] {s.title}\n" + "\n".join(f"  - {b}" for b in s.bullets)
+        for i, s in enumerate(slides)
+    )
+    prompt = REVIEW_PROMPT.format(slides_text=slides_text)
+    logger.info("review_technical_accuracy: slides=%d", len(slides))
+    data = _parse_json(_call_llm(prompt))
+    return data
