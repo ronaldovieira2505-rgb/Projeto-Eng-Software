@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.api.routes import presentations, health, github
 from app.core.config import settings
@@ -43,39 +44,59 @@ app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(presentations.router, prefix="/api/v1/presentations", tags=["presentations"])
 app.include_router(github.router, prefix="/api/v1/github", tags=["github"])
 
+
 # ── Redirecionamento "Salva-Vidas" do Link Antigo ────────────────────────────
 @app.get("/docs", include_in_schema=False)
 def redirect_old_docs():
     """
-    Se a banca ou os alunos clicarem no link antigo (/docs),
-    serão instantaneamente jogados para a raiz (onde está o Frontend).
+    Quem clicar no link antigo '/docs' será jogado direto para o Frontend na raiz '/'
     """
     return RedirectResponse(url="/")
 
 
 # ── Rota do Frontend (A Pintura do Carro) ────────────────────────────────────
-frontend_path = "frontend/dist"
+# Pega o caminho absoluto da pasta do projeto
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-if os.path.isdir(frontend_path):
+# Define os dois lugares possíveis onde o front pode estar:
+# 1. 'static' -> Usado pela Azure após o GitHub Actions rodar
+# 2. 'frontend/dist' -> Usado por você no seu computador (ambiente local)
+static_azure_path = BASE_DIR / "static"
+local_dist_path = BASE_DIR / "frontend" / "dist"
+
+# Descobre qual pasta está existindo no momento
+if static_azure_path.is_dir():
+    frontend_path = static_azure_path
+elif local_dist_path.is_dir():
+    frontend_path = local_dist_path
+else:
+    frontend_path = None
+
+if frontend_path:
+    print(f"✅ Frontend encontrado em: {frontend_path}")
+
     # Serve os arquivos CSS e JS compilados
-    app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
+    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
+
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        # Ignora as rotas que pertencem à API ou à NOVA rota do Swagger
+        # Ignora rotas do backend
         if full_path.startswith("api/") or full_path.startswith("health/") or \
-           full_path.startswith("openapi.json"):
-            return  # Deixa o FastAPI processar essas rotas normalmente
+                full_path.startswith("openapi.json"):
+            return
 
-        # Se for um arquivo específico (ex: favicon.ico, logo.png)
-        file_path = os.path.join(frontend_path, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
+            # Se for um arquivo (ex: favicon.ico, logo.png)
+        file_path = frontend_path / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
 
-        # Fallback padrão: Devolve a tela principal do React
-        return FileResponse(f"{frontend_path}/index.html")
+        # Fallback padrão: Devolve o React (Dashboard)
+        return FileResponse(str(frontend_path / "index.html"))
 else:
-    # Se estiver rodando localmente sem compilar o front, joga direto pra nova Doc
+    print("⚠️ ALERTA: Nenhuma pasta de frontend encontrada. Redirecionando para API.")
+
+
     @app.get("/")
     def read_root():
         return RedirectResponse(url="/api/docs")
