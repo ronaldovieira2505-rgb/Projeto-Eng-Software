@@ -10,21 +10,21 @@ export function Navigation({ activePage, onNavigate }: NavigationProps) {
     { id: "dashboard", label: "Dashboard" },
     { id: "create", label: "Nova Apresentação" },
     { id: "settings", label: "Configurações" },
-    { id: "modules", label: "Ecossistema" }, // A nossa nova aba aqui!
+    { id: "modules", label: "Ecossistema" },
   ];
 
   return (
-    <nav className="flex gap-6 -mb-px">
+    <nav className="flex gap-8 -mb-px mt-2">
       {tabs.map((tab) => {
         const isActive = activePage === tab.id;
         return (
           <button
             key={tab.id}
             onClick={() => onNavigate(tab.id)}
-            className={`py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+            className={`py-4 border-b-2 text-sm font-medium transition-colors tracking-wide ${
               isActive
-                ? "border-amber-500 text-amber-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                ? "border-cyan-400 text-cyan-400"
+                : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
             }`}
           >
             {tab.label}

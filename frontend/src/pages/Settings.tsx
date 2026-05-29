@@ -20,16 +20,27 @@ interface SettingsProps {
 
 export function Settings({ settings, onUpdate, onSave, saved }: SettingsProps) {
   return (
-    <div className="max-w-2xl mx-auto flex flex-col gap-6">
+    <div className="max-w-2xl mx-auto flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      <div>
+        <h2 className="text-3xl font-light text-white tracking-tight">
+          Configurações do <span className="font-semibold text-cyan-400">Módulo</span>
+        </h2>
+        <p className="text-zinc-400 mt-2 text-lg font-light">
+          Ajuste as suas credenciais e preferências de geração de IA.
+        </p>
+      </div>
 
       {/* Integrações e API Keys */}
-      <section className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-5">
-        <div className="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth="2" className="h-5 w-5">
-            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-          </svg>
-          <h2 className="text-lg font-semibold text-gray-900">Integrações e API Keys</h2>
+      <section className="bg-[#0A0A0A]/40 backdrop-blur-xl border border-white/[0.05] rounded-[2rem] p-8 shadow-2xl flex flex-col gap-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2" className="h-5 w-5">
+              <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-white">Integrações e API Keys</h2>
         </div>
 
         <Input
@@ -62,8 +73,8 @@ export function Settings({ settings, onUpdate, onSave, saved }: SettingsProps) {
       </section>
 
       {/* Preferências de Geração */}
-      <section className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-5">
-        <h2 className="text-lg font-semibold text-gray-900">Preferências de Geração</h2>
+      <section className="bg-[#0A0A0A]/40 backdrop-blur-xl border border-white/[0.05] rounded-[2rem] p-8 shadow-2xl flex flex-col gap-6">
+        <h2 className="text-xl font-semibold text-white mb-2">Preferências de Geração</h2>
 
         <Select
           label="Tom de Voz Padrão"
@@ -88,12 +99,14 @@ export function Settings({ settings, onUpdate, onSave, saved }: SettingsProps) {
       </section>
 
       {/* Notificações */}
-      <section className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-5">
-        <div className="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth="2" className="h-5 w-5">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-          <h2 className="text-lg font-semibold text-gray-900">Notificações</h2>
+      <section className="bg-[#0A0A0A]/40 backdrop-blur-xl border border-white/[0.05] rounded-[2rem] p-8 shadow-2xl flex flex-col gap-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" className="h-5 w-5">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-white">Notificações</h2>
         </div>
 
         <Checkbox
@@ -113,25 +126,28 @@ export function Settings({ settings, onUpdate, onSave, saved }: SettingsProps) {
         />
       </section>
 
-      {/* Save */}
-      <div className="flex justify-end">
-        <Button onClick={onSave} className="px-8">
+      {/* Save Button */}
+      <div className="flex justify-end mt-4">
+        <Button
+          onClick={onSave}
+          className={`px-8 py-3 rounded-xl font-semibold transition-all ${saved ? "bg-emerald-500 hover:bg-emerald-600 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_25px_rgba(6,182,212,0.5)]"}`}
+        >
           {saved ? (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" className="h-4 w-4">
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              Salvo!
-            </>
+              Salvo com Sucesso!
+            </span>
           ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="h-4 w-4">
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
                 <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
               Salvar Configurações
-            </>
+            </span>
           )}
         </Button>
       </div>

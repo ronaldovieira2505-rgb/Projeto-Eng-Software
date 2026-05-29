@@ -12,17 +12,17 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export function Select({ label, options, className = "", ...rest }: SelectProps) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-medium text-gray-700">{label}</label>
+        <label className="text-sm font-medium text-zinc-300 ml-1">{label}</label>
       )}
       <select
-        className={`w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900
-          focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${className}`}
+        className={`w-full rounded-xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-zinc-200
+          focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all shadow-inner ${className}`}
         {...rest}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option key={opt.value} value={opt.value} className="bg-zinc-900 text-zinc-200">
             {opt.label}
           </option>
         ))}
