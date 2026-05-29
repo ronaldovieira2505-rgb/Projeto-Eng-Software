@@ -6,7 +6,7 @@ import json
 import re
 import time
 import logging
-from typing import List
+from typing import List, Optional
 
 from app.core.config import settings
 from app.schemas.presentation import (

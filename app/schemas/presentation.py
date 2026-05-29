@@ -252,13 +252,13 @@ class TechnicalReviewResponse(BaseModel):
 
     # ── US #007 — Gerar a partir de arquivos soltos ──────────────────────────────
 
-    class GenerateFromFilesRequest(BaseModel):
-        repo: str = Field(..., description="owner/repo")
-        branch: str = "main"
-        file_paths: List[str] = Field(...,
-                                      description="Lista com os caminhos dos arquivos (ex: ['docs/arquitetura.md'])")
-        presentation_type: PresentationTypeEnum = PresentationTypeEnum.tech_stack
-        tone: ToneEnum = ToneEnum.formal
-        num_slides: int = Field(default=8, ge=3, le=20)
-        template_name: Optional[str] = "default"
-        swagger_url: Optional[str] = Field(default=None, description="US #025 - Link do Swagger")
+class GenerateFromFilesRequest(BaseModel):
+    repo: str = Field(..., description="owner/repo")
+    branch: str = "main"
+    file_paths: List[str] = Field(...,
+                                  description="Lista com os caminhos dos arquivos (ex: ['docs/arquitetura.md'])")
+    presentation_type: PresentationTypeEnum = PresentationTypeEnum.tech_stack
+    tone: ToneEnum = ToneEnum.formal
+    num_slides: int = Field(default=8, ge=3, le=20)
+    template_name: Optional[str] = "default"
+    swagger_url: Optional[str] = Field(default=None, description="US #025 - Link do Swagger")
