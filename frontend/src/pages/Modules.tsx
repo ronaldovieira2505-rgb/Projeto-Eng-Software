@@ -1,4 +1,4 @@
-import { motion, Variants } from "framer-motion";
+import { motion, Variants } from "motion/react";
 import { ExternalLink, Blocks, FileText, Users, Database, MonitorPlay, Workflow, MessageSquare } from "lucide-react";
 
 const MODULES = [
