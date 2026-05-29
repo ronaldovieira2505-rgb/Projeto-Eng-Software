@@ -25,6 +25,8 @@ app = FastAPI(
         "Parte da Plataforma de Documentação Inteligente — Mackenzie 2026-1."
     ),
     version="1.0.0",
+    docs_url="/api/docs",    # <--- A DOCUMENTAÇÃO OFICIAL AGORA MORA AQUI
+    redoc_url="/api/redoc",
     lifespan=lifespan,
 )
 
@@ -41,56 +43,39 @@ app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(presentations.router, prefix="/api/v1/presentations", tags=["presentations"])
 app.include_router(github.router, prefix="/api/v1/github", tags=["github"])
 
-# ── Rota do Frontend (A Pintura do Carro) ────────────────────────────────────
-# Verifica se a pasta 'static' foi criada pelo processo de build do React
-if os.path.isdir("static"):
-    # Serve os arquivos CSS e JS compilados
-    app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+# ── Redirecionamento "Salva-Vidas" do Link Antigo ────────────────────────────
+@app.get("/docs", include_in_schema=False)
+def redirect_old_docs():
+    """
+    Se a banca ou os alunos clicarem no link antigo (/docs),
+    serão instantaneamente jogados para a raiz (onde está o Frontend).
+    """
+    return RedirectResponse(url="/")
 
+
+# ── Rota do Frontend (A Pintura do Carro) ────────────────────────────────────
+frontend_path = "frontend/dist"
+
+if os.path.isdir(frontend_path):
+    # Serve os arquivos CSS e JS compilados
+    app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        # Ignora as rotas que pertencem à API ou ao Swagger
-        if full_path.startswith("api/") or full_path.startswith("health/") or full_path.startswith(
-                "docs") or full_path.startswith("openapi.json"):
-            pass
+        # Ignora as rotas que pertencem à API ou à NOVA rota do Swagger
+        if full_path.startswith("api/") or full_path.startswith("health/") or \
+           full_path.startswith("openapi.json"):
+            return  # Deixa o FastAPI processar essas rotas normalmente
 
-            # Se for um arquivo específico na raiz (ex: favicon.ico)
-        file_path = os.path.join("static", full_path)
+        # Se for um arquivo específico (ex: favicon.ico, logo.png)
+        file_path = os.path.join(frontend_path, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
 
         # Fallback padrão: Devolve a tela principal do React
-        return FileResponse("static/index.html")
+        return FileResponse(f"{frontend_path}/index.html")
 else:
-    # Se estiver rodando localmente sem compilar o front, joga pro Swagger
-    # @app.get("/")
-    # def read_root():
-    #     return RedirectResponse(url="/docs")
-
-    frontend_path = "frontend/dist"
-
-    if os.path.isdir(frontend_path):
-        # Serve os arquivos CSS e JS compilados
-        app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
-
-
-        @app.get("/{full_path:path}")
-        async def serve_frontend(full_path: str):
-            # Ignora as rotas que pertencem à API ou ao Swagger
-            if full_path.startswith("api/") or full_path.startswith("health/") or \
-                    full_path.startswith("docs") or full_path.startswith("openapi.json"):
-                return  # Deixa o FastAPI processar essas rotas normalmente
-
-            # Se for um arquivo específico (ex: favicon.ico, logo.png)
-            file_path = os.path.join(frontend_path, full_path)
-            if os.path.isfile(file_path):
-                return FileResponse(file_path)
-
-            # Fallback padrão: Devolve a tela principal do React
-            return FileResponse(f"{frontend_path}/index.html")
-    else:
-        # Se estiver rodando localmente sem compilar o front, joga pro Swagger
-        @app.get("/")
-        def read_root():
-            return RedirectResponse(url="/docs")
+    # Se estiver rodando localmente sem compilar o front, joga direto pra nova Doc
+    @app.get("/")
+    def read_root():
+        return RedirectResponse(url="/api/docs")
