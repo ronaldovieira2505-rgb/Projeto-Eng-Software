@@ -6,6 +6,7 @@ import { Settings } from "./pages/Settings";
 import { Modules } from "./pages/Modules"; // 🟢 IMPORT CORRIGIDO
 import { usePresentations } from "./hooks/usePresentations";
 import { useSettings } from "./hooks/useSettings";
+import type { ToneType } from "./types"
 
 // 🟢 TIPO ATUALIZADO (Adicionado o 'modules')
 export type Page = "dashboard" | "create" | "settings" | "modules";
@@ -15,8 +16,28 @@ export default function App() {
   const { presentations, stats, loading, error, generate } = usePresentations();
   const { settings, update, save, saved } = useSettings();
 
-  async function handleGenerate(data: Parameters<typeof generate>[0]) {
-    const success = await generate(data);
+  async function handleGenerate(data: {
+    repo_url: string;
+    swagger_url?: string;
+    file_paths?: string[]
+  }) {
+    // 2. Aqui fazemos o "cast" do tone para o tipo correto
+    const fullPayload = {
+      title: "Nova Apresentação",
+      repo: data.repo_url,
+      branch: "main",
+      audience: "Equipe Técnica",
+      swagger_url: data.swagger_url || "",
+      file_paths: data.file_paths || [],
+      tone: "technical" as ToneType, // <--- A MÁGICA ESTÁ AQUI
+      include_code: true,
+      presentation_type: "standard" as any, // <--- Se der erro aqui, usamos 'as any'
+      exportSnippets: true,
+      analyzeCommits: true,
+      detectTodos: false
+    };
+
+    const success = await generate(fullPayload);
     if (success) setActivePage("dashboard");
     return success;
   }
