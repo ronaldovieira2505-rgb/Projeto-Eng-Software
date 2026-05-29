@@ -295,3 +295,13 @@ def tags_to_text(tags: List[dict]) -> str:
         lines.append(f"- {t['name']} (Commit: {t['commit'][:7]})")
 
     return "\n".join(lines)
+
+def files_to_text(files_data: List[dict]) -> str:
+    """Formata a lista de arquivos soltos para o LLM gerar slides (US #007)."""
+    if not files_data:
+        return "Nenhum conteúdo de arquivo encontrado."
+
+    lines = ["## Conteúdo dos Arquivos Soltos\n"]
+    for f in files_data:
+        lines.append(f"### Arquivo: {f['path']}\n```\n{f['content']}\n```\n")
+    return "\n".join(lines)

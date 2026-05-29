@@ -6,7 +6,7 @@ import json
 import re
 import time
 import logging
-from typing import List
+from typing import List, Optional
 
 from app.core.config import settings
 from app.schemas.presentation import (
@@ -502,13 +502,18 @@ def _parse_slides(data: dict) -> tuple[str, List[SlideContent]]:
 # ── Funções públicas — US originais ───────────────────────────────────────────
 
 def generate_slides_from_text(
-        content: str, presentation_type: str, tone: ToneEnum, num_slides: int,
+        content: str, presentation_type: str, tone: ToneEnum, num_slides: int, swagger_url: Optional[str] = None
 ) -> tuple[str, List[SlideContent]]:
-    """US1, US4, US9, US14–US17 — Gera slides a partir de texto."""
+    """US1, US4, US9, US14–US17, US025 — Gera slides a partir de texto."""
+
+    type_instruction = _type_instruction(presentation_type)
+    if swagger_url:
+        type_instruction += f"\n- OBRIGATÓRIO: Inclua o link da doc/Swagger ({swagger_url}) no campo 'notes' ou 'bullets' dos slides relevantes."
+
     prompt = SLIDES_PROMPT.format(
         num_slides=num_slides,
         tone_instruction=_tone(tone),
-        type_instruction=_type_instruction(presentation_type),
+        type_instruction=type_instruction,
         content=content,
     )
     logger.info("generate_slides: type=%s tone=%s n=%d", presentation_type, tone, num_slides)
