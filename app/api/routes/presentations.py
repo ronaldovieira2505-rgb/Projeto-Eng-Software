@@ -20,7 +20,8 @@ from app.schemas.presentation import (
     TodosRequest, TodosResponse,
     ImproveRequest, ImproveResponse,
     DiagramRequest, TechnicalReviewRequest,
-    TechnicalReviewResponse, TechnicalIssue
+    TechnicalReviewResponse, TechnicalIssue,
+    GenerateFromFilesRequest
 )
 from app.services import llm_service, pptx_service
 from app.services.github_service import (
@@ -29,6 +30,7 @@ from app.services.github_service import (
     get_pull_requests, prs_to_text,
     fetch_releases, releases_to_text,
     fetch_todos, todos_to_text,
+    fetch_code_files, files_to_text
 )
 
 router = APIRouter()
@@ -69,7 +71,7 @@ async def generate_from_text(body: GenerateFromTextRequest):
     try:
         title, slides = llm_service.generate_slides_from_text(
             content=body.content, presentation_type=body.presentation_type.value,
-            tone=body.tone, num_slides=body.num_slides,
+            tone=body.tone, num_slides=body.num_slides, swagger_url=body.swagger_url
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro LLM: {e}")
@@ -339,3 +341,32 @@ async def review_technical(body: TechnicalReviewRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ── US #007 — Gerar a partir de arquivos soltos ──────────────────────────────
+
+@router.post("/generate/files", response_model=PresentationResponse,
+             summary="US #007 — Gerar apresentação a partir de arquivos soltos no repositório")
+async def generate_from_files(body: GenerateFromFilesRequest):
+    try:
+        files_data = await fetch_code_files(body.repo, body.branch, body.file_paths)
+        if not files_data:
+            raise HTTPException(status_code=404, detail="Nenhum arquivo válido encontrado.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro GitHub: {e}")
+
+    try:
+        title, slides = llm_service.generate_slides_from_text(
+            content=files_to_text(files_data),
+            presentation_type=body.presentation_type.value,
+            tone=body.tone, num_slides=body.num_slides, swagger_url=body.swagger_url
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro LLM: {e}")
+
+    _, filename = pptx_service.export_to_pptx(slides, title, body.template_name)
+    pid = _pid()
+    return PresentationResponse(
+        presentation_id=pid, title=title, slides=slides,
+        download_url=_dl(filename), share_url=_share(pid),
+    )
+
