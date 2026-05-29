@@ -3,6 +3,7 @@ import type {
   GenerateResponse,
 } from "../types";
 
+// @ts-ignore
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 async function request<T>(

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigation } from "./Navigation";
 import type { Page } from "../../App";
+import { TopBar } from "./TopBar";
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,28 +12,15 @@ interface LayoutProps {
 export function Layout({ children, activePage, onNavigate }: LayoutProps) {
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3 pt-5 pb-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="white" className="h-5 w-5">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900 leading-tight">
-                Módulo de Apresentações
-              </h1>
-              <p className="text-xs text-gray-500">Crie apresentações inteligentes com IA</p>
-            </div>
-          </div>
+      {/* Nova TopBar Integrada com o Ecossistema */}
+      <TopBar />
 
-          {/* Navigation tabs */}
+      {/* Navegação interna do SEU módulo (Abas de Dashboard, Criar, etc) */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-6">
           <Navigation activePage={activePage} onNavigate={onNavigate} />
         </div>
-      </header>
+      </div>
 
       {/* Main content */}
       <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
@@ -43,4 +31,4 @@ export function Layout({ children, activePage, onNavigate }: LayoutProps) {
       </footer>
     </div>
   );
-}
+} // 🟢 FALTAVA ESSA CHAVE AQUI
