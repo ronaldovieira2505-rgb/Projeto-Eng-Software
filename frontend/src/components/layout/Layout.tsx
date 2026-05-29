@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigation } from "./Navigation";
+import { Sidebar } from "./Sidebar";
 import type { Page } from "../../App";
 import { Sidebar } from "./Sidebar";
 

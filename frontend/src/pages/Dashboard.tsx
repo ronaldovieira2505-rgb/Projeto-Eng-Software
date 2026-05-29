@@ -51,12 +51,103 @@ const STATS_CONFIG = (stats: DashboardStats) => [
   },
 ];
 
+const FEATURE_CARDS = [
+  {
+    title: "Gerar Apresentação",
+    description: "Crie slides a partir de texto livre, commits do GitHub ou releases do repositório.",
+    iconBg: "bg-orange-950/60 border border-orange-900/40",
+    iconColor: "#f97316",
+    page: "create" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="1.75" className="h-6 w-6">
+        <rect x="3" y="3" width="18" height="14" rx="2" />
+        <path d="M8 21h8M12 17v4" />
+        <path d="M9 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Importar do GitHub",
+    description: "Extrai commits, pull requests e releases para gerar slides de Sprint Review.",
+    iconBg: "bg-blue-950/60 border border-blue-900/40",
+    iconColor: "#60a5fa",
+    page: "create" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.75" className="h-6 w-6">
+        <circle cx="12" cy="12" r="4" />
+        <line x1="2" y1="12" x2="8" y2="12" />
+        <line x1="16" y1="12" x2="22" y2="12" />
+        <line x1="12" y1="2" x2="12" y2="8" />
+        <line x1="12" y1="16" x2="12" y2="22" />
+      </svg>
+    ),
+  },
+  {
+    title: "Exportar .pptx",
+    description: "Converte slides gerados pela IA em arquivos PowerPoint prontos para download.",
+    iconBg: "bg-purple-950/60 border border-purple-900/40",
+    iconColor: "#a855f7",
+    page: "create" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.75" className="h-6 w-6">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+  },
+  {
+    title: "Resumir Conteúdo",
+    description: "Transforma textos longos em bullets objetivos prontos para slides.",
+    iconBg: "bg-teal-950/60 border border-teal-900/40",
+    iconColor: "#2dd4bf",
+    page: "create" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="1.75" className="h-6 w-6">
+        <line x1="8" y1="6" x2="21" y2="6" />
+        <line x1="8" y1="12" x2="21" y2="12" />
+        <line x1="8" y1="18" x2="21" y2="18" />
+        <line x1="3" y1="6" x2="3.01" y2="6" />
+        <line x1="3" y1="12" x2="3.01" y2="12" />
+        <line x1="3" y1="18" x2="3.01" y2="18" />
+      </svg>
+    ),
+  },
+  {
+    title: "Melhorar Slides",
+    description: "Refina apresentações existentes adaptando tom e linguagem para diferentes audiências.",
+    iconBg: "bg-green-950/60 border border-green-900/40",
+    iconColor: "#4ade80",
+    page: "create" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.75" className="h-6 w-6">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+      </svg>
+    ),
+  },
+  {
+    title: "Templates",
+    description: "Gerencie e aplique templates de marca personalizados nas apresentações.",
+    iconBg: "bg-red-950/60 border border-red-900/40",
+    iconColor: "#f87171",
+    page: "settings" as const,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" className="h-6 w-6">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18M9 21V9" />
+      </svg>
+    ),
+  },
+];
+
 interface DashboardProps {
   presentations: Presentation[];
   stats: DashboardStats;
+  onNavigate?: (page: "dashboard" | "create" | "settings") => void;
 }
 
-export function Dashboard({ presentations, stats }: DashboardProps) {
+export function Dashboard({ presentations, stats, onNavigate }: DashboardProps) {
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -128,8 +219,8 @@ export function Dashboard({ presentations, stats }: DashboardProps) {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
