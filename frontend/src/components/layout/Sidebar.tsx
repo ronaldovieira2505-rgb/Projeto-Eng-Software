@@ -11,12 +11,12 @@ import {
 
 export function Sidebar() {
   const navLinks = [
-    { name: "Projetos e Usuários", icon: Users, url: "https://grupo1.azurewebsites.net", isExternal: true },
-    { name: "Ingestão", icon: UploadCloud, url: "https://grupo2.azurewebsites.net", isExternal: true },
-    { name: "Relatórios", icon: BarChart, url: "https://moduloderelatorios.azurewebsites.net", isExternal: true },
+    { name: "Projetos e Usuários", icon: Users, url: "https://gerenciamento-projetos-users-e9fffgewdxe6gkfe.centralus-01.azurewebsites.net/#/login", isExternal: true },
+    { name: "Ingestão", icon: UploadCloud, url: "https://mod2eng.azurewebsites.net/", isExternal: true },
+    { name: "Relatórios", icon: BarChart, url: "https://moduloderelatorios.azurewebsites.net/", isExternal: true },
     { name: "Apresentações", icon: Presentation, url: "/", isExternal: false },
-    { name: "Diagramas e Doc.", icon: BookOpen, url: "https://grupo5.azurewebsites.net", isExternal: true },
-    { name: "Consulta", icon: Search, url: "https://grupo6.azurewebsites.net", isExternal: true }
+    { name: "Diagramas e Doc.", icon: BookOpen, url: "https://modulo5-interface-e-nuvem.azurewebsites.net/", isExternal: true },
+    { name: "Consulta", icon: Search, url: "https://docai-frontend-7wym.onrender.com/", isExternal: true }
   ];
 
   return (
