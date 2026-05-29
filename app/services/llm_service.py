@@ -473,14 +473,27 @@ def _call_llm(prompt: str) -> str:
 # ── JSON parser ───────────────────────────────────────────────────────────────
 
 def _parse_json(raw: str) -> dict:
-    clean = re.sub(r"```(?:json)?|```", "", raw).strip()
-    start = clean.find("{")
-    end = clean.rfind("}") + 1
+    import json
+    import re
+
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+
     if start == -1 or end == 0:
-        raise ValueError(f"LLM não retornou JSON válido:\n{raw[:300]}")
-    return json.loads(clean[start:end])
+        raise ValueError("JSON nao encontrado no texto")
 
+    json_str = raw[start:end]
 
+    # Limpa as virgulas extras
+    json_str = re.sub(r',\s*}', '}', json_str)
+    json_str = re.sub(r',\s*]', ']', json_str)
+
+    try:
+        return json.loads(json_str, strict=False)
+    except Exception as e:
+        print("\n=== ERRO NO JSON DA IA ===")
+        print(json_str)
+        raise ValueError(f"Erro ao ler JSON: {e}")
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _tone(tone: ToneEnum) -> str:
