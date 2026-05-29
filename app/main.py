@@ -64,6 +64,33 @@ if os.path.isdir("static"):
         return FileResponse("static/index.html")
 else:
     # Se estiver rodando localmente sem compilar o front, joga pro Swagger
-    @app.get("/")
-    def read_root():
-        return RedirectResponse(url="/docs")
+    # @app.get("/")
+    # def read_root():
+    #     return RedirectResponse(url="/docs")
+
+    frontend_path = "frontend/dist"
+
+    if os.path.isdir(frontend_path):
+        # Serve os arquivos CSS e JS compilados
+        app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
+
+
+        @app.get("/{full_path:path}")
+        async def serve_frontend(full_path: str):
+            # Ignora as rotas que pertencem à API ou ao Swagger
+            if full_path.startswith("api/") or full_path.startswith("health/") or \
+                    full_path.startswith("docs") or full_path.startswith("openapi.json"):
+                return  # Deixa o FastAPI processar essas rotas normalmente
+
+            # Se for um arquivo específico (ex: favicon.ico, logo.png)
+            file_path = os.path.join(frontend_path, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+
+            # Fallback padrão: Devolve a tela principal do React
+            return FileResponse(f"{frontend_path}/index.html")
+    else:
+        # Se estiver rodando localmente sem compilar o front, joga pro Swagger
+        @app.get("/")
+        def read_root():
+            return RedirectResponse(url="/docs")
