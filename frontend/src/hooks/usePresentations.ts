@@ -80,11 +80,38 @@ export function usePresentations() {
         )
       );
       return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao gerar apresentação.");
+    } catch (err: any) {
+      console.error("Detalhes do Erro da API:", err); // Ajuda a inspecionar no F12
+
+      let errorMessage = "Erro desconhecido ao gerar apresentação.";
+
+      // 1. Tenta extrair a mensagem detalhada do FastAPI (padrão do Axios)
+      if (err.response && err.response.data && err.response.data.detail) {
+        const detail = err.response.data.detail;
+        errorMessage = typeof detail === "string" ? detail : JSON.stringify(detail);
+      }
+      // 2. Se a sua classe Api já tiver extraído o JSON da resposta (padrão Fetch)
+      else if (err.detail) {
+        errorMessage = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+      }
+      // 3. Erro genérico de rede (ex: falha de conexão)
+      else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      // 4. Último recurso: Transforma qualquer objeto teimoso em texto JSON
+      else if (typeof err === "object") {
+        errorMessage = JSON.stringify(err);
+      } else {
+        errorMessage = String(err);
+      }
+
+      setError(errorMessage);
       setPresentations((prev) => prev.filter((p) => p.id !== tempId));
       return false;
-    } finally {
+    }
+    finally {
+      // 🟢 ISSO AQUI SOLTA O BOTÃO!
+      // O 'finally' executa sempre, quer dê sucesso, quer dê erro.
       setLoading(false);
     }
   }

@@ -24,14 +24,14 @@ export default function App() {
     // 2. Aqui fazemos o "cast" do tone para o tipo correto
     const fullPayload = {
       title: "Nova Apresentação",
-      repo: data.repo_url,
+      repo: data.repo_url.replace("https://github.com/", "").replace(/\/$/, ""), // ✅ Ele vai enviar apenas "facebook/react"
       branch: "main",
       audience: "Equipe Técnica",
       swagger_url: data.swagger_url || "",
       file_paths: data.file_paths || [],
       tone: "technical" as ToneType, // <--- A MÁGICA ESTÁ AQUI
       include_code: true,
-      presentation_type: "standard" as any, // <--- Se der erro aqui, usamos 'as any'
+      presentation_type: "generic" as any, // <--- Se der erro aqui, usamos 'as any'
       exportSnippets: true,
       analyzeCommits: true,
       detectTodos: false
