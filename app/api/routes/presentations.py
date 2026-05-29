@@ -19,7 +19,8 @@ from app.schemas.presentation import (
     ReleasesRequest,
     TodosRequest, TodosResponse,
     ImproveRequest, ImproveResponse,
-    DiagramRequest,
+    DiagramRequest, TechnicalReviewRequest,
+    TechnicalReviewResponse, TechnicalIssue
 )
 from app.services import llm_service, pptx_service
 from app.services.github_service import (
@@ -36,8 +37,10 @@ router = APIRouter()
 def _dl(filename: str) -> str:
     return f"/api/v1/presentations/download/{filename}"
 
+
 def _share(pid: str) -> str:
     return f"/api/v1/presentations/{pid}/share"
+
 
 def _pid() -> str:
     return uuid.uuid4().hex
@@ -163,12 +166,12 @@ async def generate_changelog(body: ChangelogRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro LLM: {e}")
 
-    title  = data.get("title", "Changelog")
+    title = data.get("title", "Changelog")
     raw_slides = data.get("slides", [])
 
     from app.schemas.presentation import SlideContent
     slides_obj = [SlideContent(**s) for s in raw_slides]
-    entries    = [ChangelogEntry(**e) for e in data.get("entries", [])]
+    entries = [ChangelogEntry(**e) for e in data.get("entries", [])]
 
     _, filename = pptx_service.export_to_pptx(slides_obj, title, body.template_name)
     pid = _pid()
@@ -314,5 +317,25 @@ async def improve_slides(body: ImproveRequest):
             slides=body.slides, audience=body.audience, tone=body.tone,
         )
         return ImproveResponse(summary=summary, improvements=improvements)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── US — Revisão Técnica ──────────────────────────────────────────────────────
+
+@router.post("/review-technical", response_model=TechnicalReviewResponse,
+             summary="US: Revisar descrições técnicas para garantir precisão")
+async def review_technical(body: TechnicalReviewRequest):
+    if not body.slides:
+        raise HTTPException(status_code=422, detail="Envie pelo menos 1 slide para analisar.")
+    try:
+        data = llm_service.review_technical_accuracy(slides=body.slides)
+
+        corrections = [TechnicalIssue(**c) for c in data.get("corrections", [])]
+
+        return TechnicalReviewResponse(
+            summary=data.get("summary", ""),
+            corrections=corrections
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
