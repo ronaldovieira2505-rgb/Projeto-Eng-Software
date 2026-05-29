@@ -31,6 +31,9 @@ class PresentationTypeEnum(str, Enum):
     lessons_learned      = "lessons_learned"
     technical_debt       = "technical_debt"
     architecture_evolution = "architecture_evolution"
+    monthly_retrospective = "monthly_retrospective"
+    cicd_strategy = "cicd_strategy"
+    frontend_backend_progress = "frontend_backend_progress"
 
 
 # ── Slide base ────────────────────────────────────────────────────────────────
@@ -227,3 +230,15 @@ class SlideImprovement(BaseModel):
 class ImproveResponse(BaseModel):
     summary:      str
     improvements: List[SlideImprovement]
+
+class TechnicalReviewRequest(BaseModel):
+    slides: List[SlideContent]
+
+class TechnicalIssue(BaseModel):
+    slide_index: int
+    issue:       str
+    suggestion:  str
+
+class TechnicalReviewResponse(BaseModel):
+    summary:     str
+    corrections: List[TechnicalIssue]
