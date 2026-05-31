@@ -62,8 +62,25 @@ export function usePresentations() {
     setPresentations((prev) => [tempPresentation, ...prev]);
 
     try {
+      // 1. Faz a requisição na API (O seu código original)
       const result = await presentationsApi.generateFromCommits(data);
 
+      // 2. --- A MÁGICA DO DOWNLOAD ENTRA AQUI ---
+      if (result && result.download_url) {
+        const baseUrl = "https://modulo4-apresentacoes-v2.azurewebsites.net";
+        // Junta o domínio do Azure com a rota (/api/v1/...) que veio do Python
+        const urlCompleta = `${baseUrl}${result.download_url}`;
+
+        const linkFantasma = document.createElement('a');
+        linkFantasma.href = urlCompleta;
+        linkFantasma.setAttribute('download', '');
+        document.body.appendChild(linkFantasma);
+        linkFantasma.click();
+        linkFantasma.remove();
+      }
+      // ------------------------------------------
+
+      // 3. Atualiza os cards visuais na tela (O seu código original)
       setPresentations((prev) =>
         prev.map((p) =>
           p.id === tempId
@@ -79,6 +96,7 @@ export function usePresentations() {
             : p
         )
       );
+
       return true;
     } catch (err: any) {
       console.error("Detalhes do Erro da API:", err); // Ajuda a inspecionar no F12

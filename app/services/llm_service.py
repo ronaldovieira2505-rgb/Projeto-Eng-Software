@@ -7,6 +7,9 @@ import re
 import time
 import logging
 from typing import List, Optional
+import json_repair
+
+
 
 from app.core.config import settings
 from app.schemas.presentation import (
@@ -473,7 +476,7 @@ def _call_llm(prompt: str) -> str:
 # ── JSON parser ───────────────────────────────────────────────────────────────
 
 def _parse_json(raw: str) -> dict:
-    import json
+    import json_repair  # 1. Trocamos o import json nativo pelo reparador
     import re
 
     start = raw.find("{")
@@ -484,12 +487,14 @@ def _parse_json(raw: str) -> dict:
 
     json_str = raw[start:end]
 
-    # Limpa as virgulas extras
+    # Limpa as virgulas extras (Pode manter, ajuda a pré-limpar)
     json_str = re.sub(r',\s*}', '}', json_str)
     json_str = re.sub(r',\s*]', ']', json_str)
 
     try:
-        return json.loads(json_str, strict=False)
+        # 2. A MÁGICA ACONTECE AQUI:
+        # Substituímos o json.loads comum pelo json_repair.loads
+        return json_repair.loads(json_str)
     except Exception as e:
         print("\n=== ERRO NO JSON DA IA ===")
         print(json_str)
