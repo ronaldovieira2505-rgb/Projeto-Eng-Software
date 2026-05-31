@@ -10,25 +10,23 @@
 ### 1. Gerar apresentação a partir de texto
 **Caso de uso:** o módulo de Ingestão ou o módulo de Consulta manda conteúdo bruto (resumo de sprint, README, lista de tarefas) e recebe slides prontos + link para download do `.pptx`.
 
-```
+```http
 POST /api/v1/presentations/generate/text
-Content-Type: application/json
 ```
 
 **Body:**
 ```json
 {
-  "content": "Texto de entrada — pode ser qualquer coisa: resumo, README, notas de reunião.",
+  "content": "Conteúdo base...",
   "presentation_type": "sprint_review",
   "tone": "formal",
   "num_slides": 8,
-  "template_name": "default",
-  "project_id": "uuid-do-projeto-na-plataforma"
+  "template_name": "default"
 }
 ```
 
 **Valores aceitos para `presentation_type`:**
-`sprint_review` · `next_steps` · `architecture` · `roadmap` · `post_mortem` · `onboarding` · `tech_stack` · `generic`
+`sprint_review` · `next_steps` · `architecture` · `roadmap` · `post_mortem` · `onboarding` · `tech_stack` · `generic`· `risks` · `lessons_learned` · `technical_debt` · `architecture_evolution`
 
 **Valores aceitos para `tone`:**
 `formal` · `persuasive` · `technical` · `simplified`
@@ -57,14 +55,14 @@ Content-Type: application/json
 ### 2. Resumir texto em tópicos para slides
 **Caso de uso:** módulo de Consulta quer transformar uma resposta longa da IA em bullets para um slide.
 
-```
+```http
 POST /api/v1/presentations/summarize
 ```
 
 **Body:**
 ```json
 {
-  "text": "Texto longo aqui...",
+  "text": "Texto longo...",
   "max_bullets": 5,
   "tone": "formal",
   "simplify_technical": false
@@ -86,7 +84,7 @@ POST /api/v1/presentations/summarize
 ### 3. Gerar apresentação a partir de commits do GitHub
 **Caso de uso:** módulo de Ingestão já leu os commits e quer gerar slides de Sprint Review.
 
-```
+```http
 POST /api/v1/presentations/generate/commits
 ```
 
@@ -106,7 +104,7 @@ POST /api/v1/presentations/generate/commits
 ### 4. Exportar slides para .pptx
 **Caso de uso:** outro módulo já tem uma lista de slides montada e quer só o arquivo.
 
-```
+```http
 POST /api/v1/presentations/export/pptx
 ```
 
@@ -193,4 +191,85 @@ const resp = await fetch("http://presentation-service:8000/api/v1/presentations/
 });
 const data = await resp.json();
 console.log(data.bullets);
+```
+### 6. Atualização: Novos Tipos de Apresentação Aceitos
+No endpoint `/generate/text`, além dos tipos básicos, você agora pode enviar:
+`risks` (Mapeamento de Riscos) · `lessons_learned` (Lições Aprendidas) · `technical_debt` (Dívida Técnica) · `architecture_evolution` (Evolução da Arquitetura)
+
+---
+
+### 7. Gerar Roadmap Técnico via TODOs no Código (US12)
+**Caso de uso:** Lê a árvore de arquivos de código no GitHub e extrai comentários `TODO:` ou `FIXME:` transformando em slides de Dívida Técnica/Roadmap.
+
+```http
+POST /api/v1/presentations/generate/todos
+```
+
+```json
+{
+  "repo": "owner/repo",
+  "branch": "main",
+  "extensions": [".py", ".ts", ".js", ".java", ".go"],
+  "generate_slides": true,
+  "tone": "formal"
+}
+```
+
+```http
+POST /api/v1/presentations/generate/releases
+```
+
+```json
+{
+  "repo": "owner/repo",
+  "tone": "persuasive"
+}
+```
+
+```http
+POST /api/v1/presentations/changelog
+```
+
+```json
+{
+  "repo": "owner/repo",
+  "num_commits": 30,
+  "tone": "formal"
+}
+```
+
+```http
+POST /api/v1/presentations/generate/pull-requests
+```
+
+```json
+{
+  "repo": "owner/repo",
+  "state": "closed",
+  "tone": "technical"
+}
+```
+
+```http
+POST /api/v1/presentations/faq
+```
+
+```json
+{
+  "content": "Conteúdo da apresentação...",
+  "num_questions": 5,
+  "audience": "diretoria"
+}
+```
+
+```http
+POST /api/v1/presentations/improve
+```
+
+```json
+{
+  "slides": [ { "title": "...", "bullets": ["..."] }],
+  "audience": "stakeholders",
+  "tone": "persuasive"
+}
 ```

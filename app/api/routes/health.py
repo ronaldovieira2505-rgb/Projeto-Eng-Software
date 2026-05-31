@@ -11,6 +11,8 @@ async def health():
 async def ready():
     is_ready = bool(settings.GEMINI_API_KEY or settings.ANTHROPIC_API_KEY)
     return {
-        "status": "ok",
-        "ready": is_ready
+        "ready": is_ready,
+        "checks": {
+            "llm_key_configured": is_ready
+        }
     }
